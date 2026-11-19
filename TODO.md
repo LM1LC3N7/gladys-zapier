@@ -76,3 +76,4 @@
   shows the Zap runs counted over both windows, the Gladys Plus state, refused hooks, pauses.
 - **Button budget** 18 s from the click, scene budget 25 s (manifest 45 s, Gladys' 15 s wait for
   the connection included); one request at a time, a queue of 10.
+- [ ] r3 mineurs : test de la garde #42 (boucle bloquée 4 s pendant la sauvegarde, app.js:674), borne 6 h d'une pause de hook relue de /data (app.js:412), minuteur de pause de hook après stop() (app.js:762, :177).
