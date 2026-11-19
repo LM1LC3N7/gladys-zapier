@@ -260,19 +260,19 @@
   {
     "name": "per-minute bound counts accepted only",
     "file": "src/app.js",
-    "from": "    this.sent.push(this.monotonic());\n",
+    "from": "    this.sent.push({ mono: this.monotonic(), wall: this.now() });\n",
     "to": ""
   },
   {
     "name": "no pause after repeated 4xx",
     "file": "src/app.js",
-    "from": "      if (this.clientErrors >= 3) {",
+    "from": "      if (c.count >= 3) {",
     "to": "      if (false) {"
   },
   {
     "name": "4xx series not reset",
     "file": "src/app.js",
-    "from": "    this.clientErrors = 0;\n    if (this.refused[slot])",
+    "from": "    this.clearClient(slot);\n    if (this.refused[slot])",
     "to": "    if (this.refused[slot])"
   },
   {
@@ -292,5 +292,83 @@
     "file": "src/app.js",
     "from": "    // The counts shown in the status change with it.\n    this.publishStatus();\n",
     "to": ""
+  },
+  {
+    "name": "client pause global (any hook)",
+    "file": "src/app.js",
+    "from": "if (!test && this.clientPaused(slot, mono)) return 'paused_client';",
+    "to": "if (!test && Object.keys(this.clientErrors).some((k) => this.clientPaused(k, mono))) return 'paused_client';"
+  },
+  {
+    "name": "button blocked by client pause",
+    "file": "src/app.js",
+    "from": "if (!test && this.clientPaused(slot, mono)) return 'paused_client';",
+    "to": "if (this.clientPaused(slot, mono)) return 'paused_client';"
+  },
+  {
+    "name": "config save keeps client pause",
+    "file": "src/app.js",
+    "from": "      this.clearClient();\n      changed = true;",
+    "to": "      changed = true;"
+  },
+  {
+    "name": "sent not restored",
+    "file": "src/app.js",
+    "from": "      if (age < MINUTE) this.sent.push({ mono: mono - age, wall: Math.min(item, wall) });",
+    "to": ""
+  },
+  {
+    "name": "client pause not restored",
+    "file": "src/app.js",
+    "from": "      if (this.clientErrors[slot]) continue;",
+    "to": "      continue;"
+  },
+  {
+    "name": "stopped not checked in blocked",
+    "file": "src/app.js",
+    "from": "    if (!this.running || gen !== this.generation) return 'stopped';\n    if (deadline - mono < SEND_MARGIN) return 'time';",
+    "to": "    if (deadline - mono < SEND_MARGIN) return 'time';"
+  },
+  {
+    "name": "replies kept after config save",
+    "file": "src/app.js",
+    "from": "      this.clearPause();\n      this.reactive = [];",
+    "to": "      this.clearPause();"
+  },
+  {
+    "name": "merge keeps the older date",
+    "file": "src/app.js",
+    "from": "this.calls.splice(0, 2, { mono: b.mono, wall: b.wall, n: a.n + b.n });",
+    "to": "this.calls.splice(0, 2, { mono: a.mono, wall: a.wall, n: a.n + b.n });"
+  },
+  {
+    "name": "5xx streak not reset",
+    "file": "src/app.js",
+    "from": "    this.pause.streak = 0;\n    this.clearClient(slot);",
+    "to": "    this.clearClient(slot);"
+  },
+  {
+    "name": "pauseTimer kept at stop",
+    "file": "src/app.js",
+    "from": "['configTimer', 'loadTimer', 'storeTimer', 'pauseTimer']",
+    "to": "['configTimer', 'loadTimer', 'storeTimer']"
+  },
+  {
+    "name": "restored pause unbounded",
+    "file": "src/app.js",
+    "from": "const left = Math.min(until - wall, why === 'loop' ? LOOP_PAUSE : PAUSE_MAX);",
+    "to": "const left = until - wall;"
+  },
+  {
+    "name": "inbound without config",
+    "file": "src/app.js",
+    "from": "    if (!config) {\n      this.logger.warn('Inbound request ignored: configuration not read yet');",
+    "to": "    if (false) {\n      this.logger.warn('Inbound request ignored: configuration not read yet');"
+  },
+  {
+    "name": "burst log every time",
+    "file": "src/app.js",
+    "from": "if (this.inboundBurstLog === undefined || mono - this.inboundBurstLog >= MINUTE) {",
+    "to": "if (true) {"
   }
 ]

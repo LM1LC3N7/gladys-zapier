@@ -28,8 +28,10 @@ divide the tasks of your plan by the action steps of your Zaps.
   your other Zaps use;
 - at most **10 requests per minute**, whatever the caps, answered or not (a request Zapier refused
   counts here even when its run is given back);
-- from the **third refusal in a row** (a 4xx answer or a redirect), a pause of 60 s, doubled at each
-  new refusal, 6 h at most, lifted by a send Zapier accepts.
+- from the **third refusal in a row of one Catch Hook** (a 4xx answer or a redirect), a pause of
+  **that hook only**, 60 s, doubled at each new refusal, 6 h at most: the other hooks go on. During
+  the pause the test button may still try the hook (one request per click); a send it accepts ends
+  the series, and saving the configuration lifts the pause at once.
 
 A send is counted, and the count saved in `/data`, **before** its request leaves (no save, no
 request), so the count survives a restart. It is given back only when Zapier surely did not take it

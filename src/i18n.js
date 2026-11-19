@@ -51,10 +51,6 @@ export const T = {
           en: 'Zapier asked to slow down (429)',
           fr: 'Zapier a demandé de ralentir (429)',
         },
-        client: {
-          en: 'Zapier refused several sends in a row (4xx)',
-          fr: "Zapier a refusé plusieurs envois d'affilée (4xx)",
-        },
         loop: {
           en: 'Probable loop (a Zap calling Gladys, a scene sending back to Zapier)',
           fr: 'Boucle probable (un Zap qui appelle Gladys, une scène qui renvoie vers Zapier)',
@@ -75,6 +71,10 @@ export const T = {
     ready: ({ slots, day, maxDay, month, maxMonth }) => ({
       en: `Ready to send to Catch Hook ${list(slots)}. Zap runs counted by this module: ${n(day, 'en')} of ${n(maxDay, 'en')} over 24 hours, ${n(month, 'en')} of ${n(maxMonth, 'en')} over 30 days.`,
       fr: `Prêt à envoyer vers le Catch Hook ${list(slots)}. Exécutions de Zap comptées par ce module : ${n(day, 'fr')} sur ${n(maxDay, 'fr')} sur 24 heures, ${n(month, 'fr')} sur ${n(maxMonth, 'fr')} sur 30 jours.`,
+    }),
+    hook_paused: (slot, minutes) => ({
+      en: ` Catch Hook ${slot}: paused about ${minutes} min after several refusals (4xx) in a row; the test button may try it, saving the configuration lifts the pause.`,
+      fr: ` Catch Hook ${slot} : en pause environ ${minutes} min après plusieurs refus (4xx) d'affilée ; le bouton de test peut l'essayer, enregistrer la configuration lève la pause.`,
     }),
     receive_only: {
       en: 'No Catch Hook URL: nothing is sent to Zapier.',
@@ -153,8 +153,8 @@ export const T = {
       fr: `en pause après un 5xx de Zapier (encore environ ${m} min)`,
     }),
     paused_client: (m) => ({
-      en: `paused after several refusals (4xx) in a row (about ${m} min left)`,
-      fr: `en pause après plusieurs refus (4xx) d'affilée (encore environ ${m} min)`,
+      en: `this Catch Hook is paused after several refusals (4xx) in a row (about ${m} min left)`,
+      fr: `ce Catch Hook est en pause après plusieurs refus (4xx) d'affilée (encore environ ${m} min)`,
     }),
     loop: {
       en: 'probable loop between a Zap and a scene: sends stopped for 30 min (save the configuration to resume)',

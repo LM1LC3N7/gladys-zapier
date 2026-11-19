@@ -47,8 +47,9 @@
   bills a task per action step): the docs say to divide the plan by the action steps.
 - **Caps**: tasks over a rolling 24 hours (1 to 2000, 20 by default) and a rolling 30 days (1 to
   50000, 500 by default), plus 10
-  requests per minute (given back or not), and a pause doubled from 60 s after 3 refusals (4xx,
-  redirect) in a row. Rolling windows on the monotonic clock, dated by the wall clock in `/data`
+  requests per minute (given back or not), and a pause of one hook, doubled from 60 s, after 3
+  refusals (4xx, redirect) in a row from it: the other hooks go on, the test button may try it,
+  saving the configuration lifts it. The per-minute bound is kept in `/data`. Rolling windows on the monotonic clock, dated by the wall clock in `/data`
   only (a clock set back keeps the count longer, never shorter).
 - **No retry**, ever: a timeout, a cut connection or a 5xx may have run the Zap. A 4xx, a 429, a
   redirect (never followed), a refused name or connection give the task back.

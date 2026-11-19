@@ -20,8 +20,9 @@ the notes of the version's GitHub Release.
 - The button "Send a test event" (`gladys_test`), which also says whether events can come from
   Zapier.
 - Caps of Zap runs over 24 hours (20 by default) and over 30 days (500 by default), 10 requests
-  per minute at most, counted and saved in `/data` before each request; a growing pause after 3
-  refusals (4xx) in a row.
+  per minute at most, counted and saved in `/data` before each request; a growing pause of one
+  hook after 3 refusals (4xx) in a row from it (the other hooks go on; the test button may try it,
+  saving the configuration lifts it).
 - No second try of a send that may have been taken (timeout, cut connection, 5xx); one request
   at a time; a pause after a 429 (Retry-After, 60 s to 6 h) or a 5xx (60 s, doubled, 6 h at
   most); a hook answered 404/410 no longer used by scenes until a new URL or a test succeeds.

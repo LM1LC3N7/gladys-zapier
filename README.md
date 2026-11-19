@@ -10,7 +10,7 @@ Zapier, both ways:
 
 - Each send runs a Zap (Zapier bills a task per action step): caps of Zap runs in the module (over
   24 hours and over 30 days, 10 requests per minute), counted and saved in `/data` before each
-  request, kept across a restart; a growing pause after 3 refusals (4xx) in a row.
+  request, kept across a restart; a growing pause of one hook after 3 refusals (4xx) in a row from it.
 - A send that may have been taken (timeout, cut connection, 5xx) is never tried again; pauses after
   a 429 or a 5xx; a hook Zapier does not know (404/410) is no longer used by scenes.
 - An event received never sends anything. A loop built by a scene (event → send → Zap → Gladys) is

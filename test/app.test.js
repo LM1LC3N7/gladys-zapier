@@ -606,8 +606,14 @@ test('refusals (4xx) count in the per-minute bound and pause from the third in a
   const outs = [];
   for (let i = 0; i < 30; i += 1) outs.push(message(await b.scene()));
   assert.equal(b.api.requests.length, 3);
-  assert.match(outs[3], /paused after several refusals \(4xx\) in a row \(about 1 min left\)/);
-  assert.match(lastStatus(b.gladys).message.en, /refused several sends in a row/);
+  assert.match(
+    outs[3],
+    /this Catch Hook is paused after several refusals \(4xx\) in a row \(about 1 min left\)/,
+  );
+  assert.match(
+    lastStatus(b.gladys).message.en,
+    /Catch Hook 1: paused about 1 min after several refusals/,
+  );
   await b.wait(61 * SECOND);
   await b.scene();
   await b.wait(61 * SECOND);
@@ -615,7 +621,7 @@ test('refusals (4xx) count in the per-minute bound and pause from the third in a
   refuse = false;
   await b.wait(60 * SECOND);
   assert.equal((await b.scene()).success, true);
-  assert.equal(b.app.clientErrors, 0, 'a success resets the series');
+  assert.equal(b.app.clientErrors['1'], undefined, 'a success resets the series');
 });
 
 test('the per-minute bound counts the requests given back too', async () => {
@@ -698,4 +704,156 @@ test('a reply is judged when the scene calls it, not when it leaves the queue', 
   await b.run(30 * SECOND);
   assert.equal((await slow).success, true);
   assert.match(message(await reply), /probable loop/);
+});
+
+test('a hook refusing (4xx) pauses itself only; the button tries it; saving the config lifts it', async () => {
+  const b = await setup({
+    config: { hook_1: HOOK1, hook_2: HOOK2, max_sends_per_day: 2000 },
+    handler: (r) => (r.url === HOOK1 ? json({}, 400) : undefined),
+  });
+  for (let i = 0; i < 4; i += 1) await b.scene();
+  assert.equal(b.api.requests.length, 3);
+  assert.equal((await b.scene({ zap: '2', event: 'x' })).success, true, 'hook 2 goes on');
+  assert.match(
+    lastStatus(b.gladys).message.en,
+    /Ready to send to Catch Hook 2.*Catch Hook 1: paused/,
+  );
+  assert.equal(lastStatus(b.gladys).connected, true);
+  // The button may try the paused hook: one request per click.
+  const ack = await b.gladys.fake.action('send_test', { zap: '1' });
+  assert.match(ack.data.message.en, /refused by Zapier \(400\)/);
+  assert.equal(b.api.requests.filter((r) => r.url === HOOK1).length, 4);
+  // Saving the configuration lifts the pause.
+  b.api.handler = undefined;
+  await b.gladys.fake.configUpdated({ hook_1: HOOK1, hook_2: HOOK2, max_sends_per_day: 2000 });
+  assert.equal((await b.scene()).success, true);
+});
+
+test('the pause of a hook after 4xx and the per-minute bound survive a restart', async () => {
+  const store = createMemoryStore();
+  const config = { ...BASE_CONFIG, max_sends_per_day: 2000 };
+  const a = await setup({ store, config, handler: () => json({}, 400) });
+  for (let i = 0; i < 3; i += 1) await a.scene();
+  assert.equal(store.data.client['1'].count, 3);
+  await a.app.stop();
+  const b = await setup({ store, config, now: Date.parse('2026-11-15T09:00:30Z') });
+  assert.match(message(await b.scene()), /this Catch Hook is paused/);
+  assert.equal(b.api.requests.length, 0);
+
+  const s2 = createMemoryStore();
+  const c = await setup({
+    store: s2,
+    config,
+    handler: (r) => (r.body.event === 'no' ? json({}, 400) : undefined),
+  });
+  for (let i = 0; i < 10; i += 1) await c.scene({ zap: '1', event: i % 2 ? 'no' : 'ok' });
+  assert.equal(c.api.requests.length, 10);
+  await c.app.stop();
+  const d = await setup({ store: s2, config, now: Date.parse('2026-11-15T09:00:20Z') });
+  assert.match(message(await d.scene()), /more than 10 sends in a minute/);
+  await d.wait(MINUTE);
+  assert.equal((await d.scene()).success, true);
+});
+
+test('stop() while a send waits in the queue: refused before it is counted', async () => {
+  const store = createMemoryStore();
+  const b = await setup({
+    store,
+    handler: () => new Promise((resolve) => b.clock.timers.setTimeout(resolve, 2_000)),
+  });
+  const first = b.scene();
+  const second = b.app.send(FIELDS).catch((err) => err.code);
+  await b.run(100);
+  const savesBefore = store.saves;
+  const stopped = b.app.stop();
+  await b.run(5 * SECOND);
+  await first;
+  assert.equal(await second, 'stopped');
+  await stopped;
+  assert.equal(store.saves - savesBefore, 1, 'only the save after the first request');
+  assert.equal(b.api.requests.length, 1);
+});
+
+test('saving the config after a loop also forgets the replies counted', async () => {
+  const b = await setup({ config: { ...BASE_CONFIG, max_sends_per_day: 100 } });
+  for (let i = 0; i < 4; i += 1) {
+    await b.inbound({ event: 'ping' });
+    await b.scene();
+    await b.wait(SECOND);
+  }
+  assert.match(message(await b.scene()), /probable loop/);
+  await b.gladys.fake.configUpdated({ ...BASE_CONFIG, max_sends_per_day: 100 });
+  await b.inbound({ event: 'ping' });
+  assert.equal((await b.scene()).success, true, 'a reply right after is allowed again');
+});
+
+test('merging old counts keeps the date of the newer one', async () => {
+  const b = await setup();
+  const m0 = b.clock.monotonic();
+  b.app.calls = [{ mono: m0, wall: 0, n: 1 }];
+  for (let i = 0; i < 1000; i += 1) b.app.calls.push({ mono: m0 + 12 * HOUR, wall: 0, n: 1 });
+  b.app.trimCalls();
+  assert.equal(b.app.used(m0 + 25 * HOUR, DAY), 1001);
+});
+
+test('a 5xx series starts again from 60 s after a success', async () => {
+  let fail = true;
+  const b = await setup({
+    config: { ...BASE_CONFIG, max_sends_per_day: 100 },
+    handler: () => (fail ? json({}, 503) : undefined),
+  });
+  await b.scene();
+  await b.wait(61 * SECOND);
+  fail = false;
+  assert.equal((await b.scene()).success, true);
+  fail = true;
+  await b.scene();
+  await b.wait(61 * SECOND);
+  fail = false;
+  assert.equal((await b.scene()).success, true, 'the pause is 60 s again, not 120 s');
+});
+
+test('no pause timer survives stop()', async () => {
+  const b = await setup({ handler: () => json({}, 503) });
+  await b.scene();
+  await b.app.stop();
+  assert.equal(b.clock.pending, 0);
+});
+
+test('a pause read from /data is bounded to 6 h', async () => {
+  const store = createMemoryStore({
+    pause: { until: Date.parse('2026-11-17T09:00:00Z'), why: 'server', streak: 1 },
+    calls: [],
+  });
+  const b = await setup({ store });
+  assert.match(message(await b.scene()), /5xx/);
+  await b.wait(6 * HOUR + SECOND);
+  assert.equal((await b.scene()).success, true);
+});
+
+test('an event before the configuration is read is dropped, never a crash', async () => {
+  const b = await setup({ start: false });
+  await b.app.handleInbound({ body: '{"event":"e"}' });
+  assert.equal(b.gladys.fake.sceneEvents.length, 0);
+  assert.ok(b.lines.some((l) => /configuration not read yet/.test(l)));
+});
+
+test('more than 60 events a minute: one log line per minute', async () => {
+  const b = await setup();
+  for (let i = 0; i < 70; i += 1) await b.app.handleInbound({ body: '{"event":"e"}' });
+  await b.wait(MINUTE);
+  for (let i = 0; i < 70; i += 1) await b.app.handleInbound({ body: '{"event":"e"}' });
+  assert.equal(b.lines.filter((l) => /more than 60 in a minute/.test(l)).length, 2);
+  assert.equal(b.gladys.fake.sceneEvents.length, 120);
+});
+
+test('a loop pause read from /data lasts 30 min at most', async () => {
+  const store = createMemoryStore({
+    pause: { until: Date.parse('2026-11-15T11:00:00Z'), why: 'loop', streak: 0 },
+    calls: [],
+  });
+  const b = await setup({ store });
+  assert.match(message(await b.scene()), /probable loop/);
+  await b.wait(30 * MINUTE + SECOND);
+  assert.equal((await b.scene()).success, true);
 });

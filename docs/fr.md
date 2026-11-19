@@ -30,8 +30,11 @@ de vos Zaps.
   qu'utilisent vos autres Zaps ;
 - **10 requêtes par minute** au plus, quels que soient les plafonds, répondues ou non (une requête
   refusée par Zapier compte ici même quand son exécution est rendue) ;
-- dès le **troisième refus d'affilée** (réponse 4xx ou redirection), une pause de 60 s, doublée à
-  chaque nouveau refus, 6 h au plus, levée par un envoi accepté par Zapier.
+- dès le **troisième refus d'affilée d'un même Catch Hook** (réponse 4xx ou redirection), une pause
+  de **ce hook seulement**, 60 s, doublée à chaque nouveau refus, 6 h au plus : les autres hooks
+  continuent. Pendant la pause, le bouton de test peut encore essayer ce hook (une requête par
+  clic) ; un envoi accepté termine la série, et enregistrer la configuration lève la pause
+  aussitôt.
 
 Un envoi est compté, et le décompte enregistré dans `/data`, **avant** que sa requête parte (pas
 d'enregistrement, pas de requête) : le décompte survit à un redémarrage. Il n'est rendu que si

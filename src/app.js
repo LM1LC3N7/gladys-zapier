@@ -72,7 +72,7 @@ import { inboundEvent } from './inbound.js';
 const realTimers = { setTimeout, clearTimeout };
 const CONFIG_RETRY = [5_000, 10_000, 30_000, 60_000, 300_000];
 const REQUEST_ID = /^[A-Za-z0-9-]{1,80}$/;
-const PAUSE_WHY = ['rate_limited', 'server', 'client', 'loop'];
+const PAUSE_WHY = ['rate_limited', 'server', 'loop'];
 
 /** A refused send: nothing left. `code` is a key of T.reason. */
 export class NotSent extends Error {
@@ -132,10 +132,14 @@ export class App {
     this.inboundTimes = [];
     this.inboundRefusedLog = undefined;
     this.inboundBurstLog = undefined;
-    /** Requests that left (given back or not): the per-minute bound. */
+    /** Requests that left (given back or not): the per-minute bound, { mono, wall }, kept in /data. */
     this.sent = [];
-    /** 4xx answers in a row (given back): a growing pause from the third. */
-    this.clientErrors = 0;
+    /**
+     * Per hook: 4xx answers in a row (given back) and, from the third, a pause
+     * of THAT hook only: slot -> { count, untilMono, untilWall }. Kept in /data.
+     */
+    this.clientErrors = {};
+    this.clientTimers = {};
     /** Gladys Plus: undefined (not read), or { available, ready }. */
     this.plus = undefined;
     this.queue = Promise.resolve();
@@ -170,6 +174,8 @@ export class App {
       if (this[key]) this.timers.clearTimeout(this[key]);
       this[key] = undefined;
     }
+    for (const timer of Object.values(this.clientTimers)) this.timers.clearTimeout(timer);
+    this.clientTimers = {};
     await this.idle();
   }
 
@@ -233,6 +239,12 @@ export class App {
         delete this.refused[slot];
         changed = true;
       }
+    }
+    // Saving the configuration also lifts the pauses of the hooks after 4xx
+    // in a row (the user fixed the Zap or its URL).
+    if (Object.keys(this.clientErrors).length) {
+      this.clearClient();
+      changed = true;
     }
     if (this.pause.why === 'loop' && this.pause.untilMono > this.monotonic()) {
       this.clearPause();
@@ -383,6 +395,29 @@ export class App {
     if (Number.isInteger(streak) && streak >= 0 && streak < 20) {
       this.pause.streak = Math.max(this.pause.streak, streak);
     }
+    // The requests of the last minute (the per-minute bound survives a restart).
+    for (const item of Array.isArray(data.sent) ? data.sent.slice(-50) : []) {
+      if (typeof item !== 'number' || !Number.isFinite(item)) continue;
+      const age = Math.max(0, wall - item);
+      if (age < MINUTE) this.sent.push({ mono: mono - age, wall: Math.min(item, wall) });
+    }
+    // The pauses of the hooks after 4xx in a row, bounded.
+    const client = data.client && typeof data.client === 'object' ? data.client : {};
+    for (const slot of ZAPS) {
+      const item = client[slot];
+      if (!item || !Number.isInteger(item.count) || item.count < 1 || item.count > 1000) continue;
+      if (this.clientErrors[slot]) continue;
+      const left =
+        typeof item.until === 'number' && Number.isFinite(item.until)
+          ? Math.min(Math.max(0, item.until - wall), PAUSE_MAX)
+          : 0;
+      this.clientErrors[slot] = {
+        count: item.count,
+        untilMono: mono + left,
+        untilWall: wall + left,
+      };
+      if (left > 0) this.armClientTimer(slot, left);
+    }
     // The refused hooks: their marks under the salt of /data.
     if (typeof data.salt === 'string' && /^[0-9a-f]{32}$/.test(data.salt)) {
       this.salt = data.salt;
@@ -406,6 +441,13 @@ export class App {
           ? { until: this.pause.untilWall, why: this.pause.why, streak: this.pause.streak }
           : { streak: this.pause.streak },
       calls: this.calls.map(({ wall, n }) => ({ wall, n })),
+      sent: this.sent.map(({ wall }) => wall),
+      client: Object.fromEntries(
+        Object.entries(this.clientErrors).map(([slot, c]) => [
+          slot,
+          { count: c.count, until: c.untilWall },
+        ]),
+      ),
     };
   }
 
@@ -499,7 +541,7 @@ export class App {
 
   /** Requests that left in the last minute, given back or not. */
   sendsLastMinute(mono) {
-    this.sent = this.sent.filter((at) => mono - at < MINUTE);
+    this.sent = this.sent.filter((at) => mono - at.mono < MINUTE);
     return this.sent.length;
   }
 
@@ -580,6 +622,9 @@ export class App {
     if (!current || current.url !== hook.url) return 'no_hook';
     // The test button may try a refused hook again (a click), a scene never.
     if (!test && this.isRefused(slot, hook.url)) return 'refused';
+    // This hook's pause after 4xx in a row: the other hooks are not touched;
+    // the test button may try it (a click, one request).
+    if (!test && this.clientPaused(slot, mono)) return 'paused_client';
     if (this.dataState === 'unreadable') return 'data_unreadable';
     if (this.sendsLastMinute(mono) >= MAX_PER_MINUTE) return 'burst';
     if (this.used(mono, DAY) + hook.zaps > this.config.maxPerDay) return 'cap_day';
@@ -603,7 +648,9 @@ export class App {
     if (why) {
       const out = new NotSent(why);
       if (why.startsWith('paused_')) {
-        out.minutes = Math.max(1, Math.ceil((this.pause.untilMono - mono) / 60_000));
+        const until =
+          why === 'paused_client' ? this.clientErrors[slot].untilMono : this.pause.untilMono;
+        out.minutes = Math.max(1, Math.ceil((until - mono) / 60_000));
       }
       throw out;
     }
@@ -627,7 +674,7 @@ export class App {
     if (deadline - this.monotonic() < SEND_MARGIN - SAVE_TIMEOUT) await giveBack('time');
     const body = { ...extra, event, source: 'gladys', sent_at: new Date(entry.wall).toISOString() };
     if (test) body.test = true;
-    this.sent.push(this.monotonic());
+    this.sent.push({ mono: this.monotonic(), wall: this.now() });
     let answer;
     try {
       answer = await postHook(hook.url, body, { fetchImpl: this.fetchImpl, now: this.now });
@@ -646,7 +693,7 @@ export class App {
     }
     // Answered with a 2xx: Zapier took it, whatever the body says.
     this.pause.streak = 0;
-    this.clientErrors = 0;
+    this.clearClient(slot);
     if (this.refused[slot]) delete this.refused[slot];
     await this.save();
     this.publishStatus();
@@ -679,13 +726,44 @@ export class App {
     } else if (err.code === 'server') {
       this.setPause(Math.max(err.retryAfter ?? 0, PAUSE_MIN * 2 ** this.pause.streak), 'server');
     } else if (err.sent === 'no' && err.status >= 300 && err.status < 500) {
-      // A Zap refusing every send (a 4xx, a redirect) is not hammered: from
-      // the third in a row, a pause of 60 s doubled each time, 6 h at most.
-      this.clientErrors += 1;
-      if (this.clientErrors >= 3) {
-        this.setPause(PAUSE_MIN * 2 ** Math.min(this.clientErrors - 3, 10), 'client', false);
+      // A hook refusing every send (a 4xx, a redirect) is not hammered: from
+      // the third in a row, a pause of THIS hook, 60 s doubled each time, 6 h
+      // at most. The other hooks go on.
+      const mono = this.monotonic();
+      const c = (this.clientErrors[slot] ??= { count: 0, untilMono: 0, untilWall: 0 });
+      c.count += 1;
+      if (c.count >= 3) {
+        const delay = Math.min(PAUSE_MAX, PAUSE_MIN * 2 ** Math.min(c.count - 3, 10));
+        c.untilMono = mono + delay;
+        c.untilWall = this.now() + delay;
+        this.armClientTimer(slot, delay);
       }
     }
+  }
+
+  clientPaused(slot, mono) {
+    const c = this.clientErrors[slot];
+    return Boolean(c && mono < c.untilMono);
+  }
+
+  /** Lifts the 4xx series of one hook, or of all. */
+  clearClient(slot) {
+    for (const key of slot ? [slot] : Object.keys(this.clientErrors)) {
+      delete this.clientErrors[key];
+      if (this.clientTimers[key]) this.timers.clearTimeout(this.clientTimers[key]);
+      delete this.clientTimers[key];
+    }
+  }
+
+  /** Republishes the status when a hook's pause ends (no timer after stop). */
+  armClientTimer(slot, delay) {
+    if (this.clientTimers[slot]) this.timers.clearTimeout(this.clientTimers[slot]);
+    delete this.clientTimers[slot];
+    if (!this.running) return;
+    this.clientTimers[slot] = this.timers.setTimeout(() => {
+      delete this.clientTimers[slot];
+      this.publishStatus();
+    }, delay + 1);
   }
 
   // --- Handlers -----------------------------------------------------------------------
@@ -792,7 +870,10 @@ export class App {
     if (this.dataState === 'unreadable')
       return { connected: false, message: join(T.status.data_unreadable, inbound) };
     const refused = slots.filter((slot) => this.isRefused(slot, c.hooks[slot].url));
-    const usable = slots.filter((slot) => !refused.includes(slot));
+    const pausedHooks = slots.filter(
+      (slot) => !refused.includes(slot) && this.clientPaused(slot, mono),
+    );
+    const usable = slots.filter((slot) => !refused.includes(slot) && !pausedHooks.includes(slot));
     const message = usable.length
       ? T.status.ready({
           slots: usable,
@@ -802,6 +883,12 @@ export class App {
           maxMonth: c.maxPerMonth,
         })
       : { en: '', fr: '' };
+    for (const slot of pausedHooks) {
+      const minutes = Math.max(1, Math.ceil((this.clientErrors[slot].untilMono - mono) / 60_000));
+      const p = T.status.hook_paused(slot, minutes);
+      message.en = `${message.en}${p.en}`.trim();
+      message.fr = `${message.fr}${p.fr}`.trim();
+    }
     if (refused.length) {
       const r = T.status.refused(refused);
       message.en = `${message.en}${r.en}`.trim();
