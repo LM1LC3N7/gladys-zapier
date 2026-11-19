@@ -1,33 +1,65 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { normalizeConfig, DEFAULT_CONFIG } from '../src/config.js';
+import { normalizeConfig, parseHook, validSecret } from '../src/config.js';
 
-test('normalizeConfig returns the defaults when called with no argument', () => {
-  assert.deepEqual(normalizeConfig(), DEFAULT_CONFIG);
+test('Catch Hook URLs: the documented form only, several Zaps joined by commas', () => {
+  assert.deepEqual(parseHook('https://hooks.zapier.com/hooks/catch/123456/zbB61/'), {
+    url: 'https://hooks.zapier.com/hooks/catch/123456/zbB61/',
+    zaps: 1,
+  });
+  assert.deepEqual(parseHook('  https://hooks.zapier.com/hooks/catch/123456/zbB61  '), {
+    url: 'https://hooks.zapier.com/hooks/catch/123456/zbB61/',
+    zaps: 1,
+  });
+  assert.equal(parseHook('https://hooks.zapier.com/hooks/catch/1/a,b,c/').zaps, 3);
+  assert.equal(parseHook(''), undefined);
+  assert.equal(parseHook(undefined), undefined);
+  for (const bad of [
+    'https://hooks.zapier.com/hooks/catch/123/',
+    'https://hooks.zapier.com/hooks/catch/abc/def/',
+    'https://hooks.zapier.com/hooks/catch/1/a,/',
+    'https://hooks.zapier.com/hooks/catch/1/a/b/',
+    'https://hooks.zapier.com:8443/hooks/catch/1/a/',
+    'https://user@hooks.zapier.com/hooks/catch/1/a/',
+    'https://hooks.zapier.com/hooks/catch/1/a/#x',
+    'https://hooks.zapier.com/hooks/catch/1/a/\r\nX: y',
+    'HTTPS://HOOKS.ZAPIER.COM/hooks/catch/1/a/',
+    'https://hooks.zapier.com/hooks/catch/1/' + 'a,'.repeat(10) + 'a/',
+    42,
+  ]) {
+    assert.equal(parseHook(bad), null, String(bad));
+  }
 });
 
-test('normalizeConfig keeps user values over the defaults', () => {
-  const config = normalizeConfig({ latitude: 45.5, longitude: -73.6, unit: 'fahrenheit' });
-  assert.equal(config.latitude, 45.5);
-  assert.equal(config.longitude, -73.6);
-  assert.equal(config.unit, 'fahrenheit');
+test('options: strict integers, bounded, defaults; issues by code only', () => {
+  const c = normalizeConfig({
+    hook_1: 'https://hooks.zapier.com/hooks/catch/1/a/',
+    hook_2: 'nope',
+    max_sends_per_day: '2.5',
+    max_sends_per_month: 999999,
+  });
+  assert.deepEqual(Object.keys(c.hooks), ['1']);
+  assert.deepEqual(c.issues, ['bad_hook_2']);
+  assert.equal(c.maxPerDay, 20);
+  assert.equal(c.maxPerMonth, 50000);
+  assert.equal(normalizeConfig({ max_sends_per_day: '' }).maxPerDay, 20);
+  assert.equal(normalizeConfig({ max_sends_per_day: 0 }).maxPerDay, 1);
+  assert.equal(normalizeConfig({ max_sends_per_day: ' 7 ' }).maxPerDay, 7);
+  assert.equal(normalizeConfig({ max_sends_per_day: 'abc' }).maxPerDay, 20);
+  assert.equal(normalizeConfig({ max_sends_per_day: null }).maxPerDay, 20);
+  assert.ok(!JSON.stringify(c).includes('nope'));
 });
 
-test('normalizeConfig coerces numeric strings coming from a form', () => {
-  const config = normalizeConfig({ latitude: '48.8', longitude: '2.3', poll_frequency: '600' });
-  assert.equal(config.latitude, 48.8);
-  assert.equal(config.longitude, 2.3);
-  assert.equal(config.poll_frequency, 600);
-  assert.equal(typeof config.poll_frequency, 'number');
-});
-
-test('normalizeConfig falls back to the default for a missing numeric field', () => {
-  const config = normalizeConfig({ unit: 'celsius' });
-  assert.equal(config.poll_frequency, DEFAULT_CONFIG.poll_frequency);
-});
-
-test('GLADYS_PREFER_LOCAL defaults to true and only an explicit false disables it', () => {
-  assert.equal(normalizeConfig().GLADYS_PREFER_LOCAL, true);
-  assert.equal(normalizeConfig({ GLADYS_PREFER_LOCAL: true }).GLADYS_PREFER_LOCAL, true);
-  assert.equal(normalizeConfig({ GLADYS_PREFER_LOCAL: false }).GLADYS_PREFER_LOCAL, false);
+test('the inbound secret: printable, 8 to 200, else locked', () => {
+  assert.ok(validSecret('abcdefgh'));
+  for (const bad of ['short', 'with space 123', 'accentué-12', 'x'.repeat(201), 'a\nbcdefghi']) {
+    assert.ok(!validSecret(bad), bad);
+    const c = normalizeConfig({ inbound_secret: bad });
+    assert.equal(c.inboundLocked, true, bad);
+    assert.equal(c.inboundSecret, '');
+  }
+  const ok = normalizeConfig({ inbound_secret: '  abcdefgh  ' });
+  assert.equal(ok.inboundSecret, 'abcdefgh');
+  assert.equal(ok.inboundLocked, false);
+  assert.equal(normalizeConfig({}).inboundLocked, false);
 });

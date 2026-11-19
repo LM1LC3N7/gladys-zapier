@@ -1,0 +1,236 @@
+[
+  {
+    "name": "cap day off",
+    "file": "src/app.js",
+    "from": "if (this.used(mono, DAY) + hook.zaps > this.config.maxPerDay) return 'cap_day';",
+    "to": "if (this.used(mono, DAY) + hook.zaps > this.config.maxPerDay + 1) return 'cap_day';"
+  },
+  {
+    "name": "cap month off",
+    "file": "src/app.js",
+    "from": "if (this.used(mono, MONTH) + hook.zaps > this.config.maxPerMonth) return 'cap_month';",
+    "to": ""
+  },
+  {
+    "name": "burst off",
+    "file": "src/app.js",
+    "from": "if (this.sendsLastMinute(mono) >= MAX_PER_MINUTE) return 'burst';",
+    "to": ""
+  },
+  {
+    "name": "zaps counted as one",
+    "file": "src/app.js",
+    "from": "const entry = { mono, wall: this.now(), n: hook.zaps };",
+    "to": "const entry = { mono, wall: this.now(), n: 1 };"
+  },
+  {
+    "name": "no save before send",
+    "file": "src/app.js",
+    "from": "    if (!saved) {\n      this.release(entry, reactive && mono);\n      throw new NotSent('data_unwritable');\n    }",
+    "to": "    if (false) {\n      throw new NotSent('data_unwritable');\n    }"
+  },
+  {
+    "name": "maybe given back",
+    "file": "src/app.js",
+    "from": "if (err.sent !== 'maybe') this.release(entry, reactive && mono);",
+    "to": "this.release(entry, reactive && mono);"
+  },
+  {
+    "name": "no-sent kept",
+    "file": "src/app.js",
+    "from": "if (err.sent !== 'maybe') this.release(entry, reactive && mono);",
+    "to": "if (false) this.release(entry, reactive && mono);"
+  },
+  {
+    "name": "refused ignored",
+    "file": "src/app.js",
+    "from": "if (!test && this.isRefused(slot, hook.url)) return 'refused';",
+    "to": ""
+  },
+  {
+    "name": "refused for button too",
+    "file": "src/app.js",
+    "from": "if (!test && this.isRefused(slot, hook.url)) return 'refused';",
+    "to": "if (this.isRefused(slot, hook.url)) return 'refused';"
+  },
+  {
+    "name": "success keeps refusal",
+    "file": "src/app.js",
+    "from": "    if (this.refused[slot]) delete this.refused[slot];\n",
+    "to": ""
+  },
+  {
+    "name": "new URL keeps refusal",
+    "file": "src/app.js",
+    "from": "        delete this.refused[slot];\n        changed = true;",
+    "to": "        changed = true;"
+  },
+  {
+    "name": "pause ignored",
+    "file": "src/app.js",
+    "from": "if (this.paused(mono)) return this.pause.why === 'loop' ? 'loop' : 'paused';",
+    "to": ""
+  },
+  {
+    "name": "pause min",
+    "file": "src/app.js",
+    "from": "const delay = Math.min(PAUSE_MAX, Math.max(grow ? PAUSE_MIN : 1, ms));",
+    "to": "const delay = Math.min(PAUSE_MAX, Math.max(1, ms));"
+  },
+  {
+    "name": "pause not restored",
+    "file": "src/app.js",
+    "from": "if (mono + left > this.pause.untilMono) this.setPause(left, why, false);",
+    "to": ""
+  },
+  {
+    "name": "calls not restored",
+    "file": "src/app.js",
+    "from": "    this.calls = [...kept, ...this.calls];\n",
+    "to": ""
+  },
+  {
+    "name": "future date shortened",
+    "file": "src/app.js",
+    "from": "const age = Math.max(0, wall - item.wall);",
+    "to": "const age = Math.abs(wall - item.wall);"
+  },
+  {
+    "name": "loop guard off",
+    "file": "src/app.js",
+    "from": "      if (this.reactive.length >= LOOP_MAX) {",
+    "to": "      if (false) {"
+  },
+  {
+    "name": "loop guard window",
+    "file": "src/app.js",
+    "from": "return this.lastInbound !== undefined && mono - this.lastInbound < LOOP_WINDOW;",
+    "to": "return this.lastInbound !== undefined && mono - this.lastInbound < LOOP_WINDOW * 2;"
+  },
+  {
+    "name": "loop not lifted by config",
+    "file": "src/app.js",
+    "from": "    if (this.pause.why === 'loop' && this.pause.untilMono > this.monotonic()) {",
+    "to": "    if (false) {"
+  },
+  {
+    "name": "reactive not recorded",
+    "file": "src/app.js",
+    "from": "    if (reactive) this.reactive.push(mono);\n",
+    "to": ""
+  },
+  {
+    "name": "unreadable data sends",
+    "file": "src/app.js",
+    "from": "if (this.dataState === 'unreadable') throw new NotSent('data_unreadable');",
+    "to": ""
+  },
+  {
+    "name": "unreadable overwritten",
+    "file": "src/app.js",
+    "from": "if (this.dataState !== 'ok' && this.dataState !== 'missing') return false;",
+    "to": "if (this.dataState === 'missing') return false;"
+  },
+  {
+    "name": "deadline ignored",
+    "file": "src/app.js",
+    "from": "if (deadline - mono < SEND_MARGIN) return 'time';",
+    "to": ""
+  },
+  {
+    "name": "hook changed while queued",
+    "file": "src/app.js",
+    "from": "if (!current || current.url !== hook.url) return 'no_hook';",
+    "to": "if (!current) return 'no_hook';"
+  },
+  {
+    "name": "inbound rate off",
+    "file": "src/app.js",
+    "from": "if (this.inboundTimes.length >= MAX_INBOUND_PER_MINUTE) {",
+    "to": "if (false) {"
+  },
+  {
+    "name": "inbound lastInbound after publish",
+    "file": "src/app.js",
+    "from": "    this.lastInbound = mono;\n",
+    "to": ""
+  },
+  {
+    "name": "secret ignored",
+    "file": "src/inbound.js",
+    "from": "if (secret && !sameSecret(fields.get('secret'), secret)) {",
+    "to": "if (false) {"
+  },
+  {
+    "name": "locked accepts",
+    "file": "src/inbound.js",
+    "from": "if (locked) return { ok: false, reason: 'secret_unreadable' };",
+    "to": ""
+  },
+  {
+    "name": "body bound off",
+    "file": "src/inbound.js",
+    "from": "if (Buffer.byteLength(text) > MAX_INBOUND_BYTES) return undefined;",
+    "to": ""
+  },
+  {
+    "name": "extra keys unbounded",
+    "file": "src/inbound.js",
+    "from": "if (kept >= MAX_EXTRA_KEYS) break;",
+    "to": ""
+  },
+  {
+    "name": "hook regex loose host",
+    "file": "src/constants.js",
+    "from": "/^https:\\/\\/hooks\\.zapier\\.com\\/hooks",
+    "to": "/^https:\\/\\/hooks\\.zapier\\.com.*\\/hooks"
+  },
+  {
+    "name": "5xx not maybe",
+    "file": "src/http.js",
+    "from": "throw new ZapierError('server', { status, sent: 'maybe', retryAfter: retryAfter() });",
+    "to": "throw new ZapierError('server', { status, retryAfter: retryAfter() });"
+  },
+  {
+    "name": "redirect followed",
+    "file": "src/http.js",
+    "from": "      redirect: 'manual',\n",
+    "to": ""
+  },
+  {
+    "name": "410 not gone",
+    "file": "src/http.js",
+    "from": "if (status === 404 || status === 410)",
+    "to": "if (status === 404)"
+  },
+  {
+    "name": "403 refusal",
+    "file": "src/http.js",
+    "from": "if (status === 404 || status === 410)",
+    "to": "if (status === 404 || status === 410 || status === 403)"
+  },
+  {
+    "name": "value cut instead of refused",
+    "file": "src/app.js",
+    "from": "  if (raw.length > MAX_VALUE) throw new NotSent('too_long');\n",
+    "to": ""
+  },
+  {
+    "name": "json size off",
+    "file": "src/app.js",
+    "from": "if (Buffer.byteLength(raw) > MAX_JSON_BYTES) throw new NotSent('json_too_large');",
+    "to": ""
+  },
+  {
+    "name": "event overridable",
+    "file": "src/app.js",
+    "from": "const body = { ...extra, event, source: 'gladys', sent_at: new Date(entry.wall).toISOString() };",
+    "to": "const body = { event, source: 'gladys', sent_at: new Date(entry.wall).toISOString(), ...extra };"
+  },
+  {
+    "name": "secret locked config",
+    "file": "src/config.js",
+    "from": "    else issues.push('bad_secret');",
+    "to": "    else inboundSecret = '';"
+  }
+]

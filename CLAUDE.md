@@ -16,8 +16,8 @@ its only runtime dependency. It started from the official JavaScript template.
 ```bash
 npm install
 npm test                                  # node --test, the built-in runner
-node --test test/devices.test.js          # one file
-node --test --test-name-pattern "plug"    # tests whose name matches
+node --test test/app.test.js              # one file
+node --test --test-name-pattern "cap"     # tests whose name matches
 npm run lint                              # ESLint
 npm run format:check                      # Prettier, as the CI runs it
 npm run format                            # Prettier, fix in place
@@ -31,18 +31,34 @@ pushing.
 ## Architecture
 
 ```
-index.js                          SDK wiring only: handlers registered before connect()
-src/devices/index.js              registry of the device blueprints + dispatch helpers
-src/devices/<type>.js             one device type per file (buildDevice, onPoll, onSetValue...)
-src/scenes.js                     scene action handlers (manifest `scene_actions`)
-src/widgets.js                    dashboard widget handlers (manifest `widgets`)
-src/config.js                     DEFAULT_CONFIG (mirrors the manifest defaults) + normalization
-src/weather.js                    example driver (Open-Meteo)
-gladys-assistant-integration.json manifest: name, config_schema, actions, image...
-docs/en.md, docs/fr.md            user documentation, re-hosted by Gladys (mandatory)
-test/                             node --test, against the SDK's fake Gladys (integration-sdk/testing)
-.github/scripts/release.mjs       release helpers (manifest bump, changelog), tested in test/
+index.js            SDK wiring only: handlers registered before connect()
+src/app.js          queue, guards (caps, pauses, loop guard, refused hooks), sends, inbound, /data, status
+src/http.js         the only network code: timeout, User-Agent, bounded body, "may have been taken"
+src/inbound.js      a Gladys Plus request -> the scene event data (pure, bounded, secret check)
+src/config.js       strict reading of the configuration (Catch Hook URLs, caps, secret)
+src/store.js        /data state file (missing vs unreadable, atomic write)
+src/i18n.js         status, button and scene texts (en, fr)
+src/constants.js    manifest keys, bounds, delays
+scripts/mutants.mjs mutation check (scripts/mutants.json)
+scripts/cover.mjs   cover.png
 ```
+
+## Module rules
+
+- Zapier is called only by the two scene actions and the "Send a test event"
+  button: never at start, on a reconnection, on a configuration change, by a
+  timer, nor because an event was received (no loop).
+- A send that may have been taken is never tried again (a Zap run = tasks).
+  The caps are reserved AND saved in /data before the request (no save, no
+  request), and given back only when nothing surely left.
+- The Catch Hook URLs and the inbound secret are secrets: never in a log, a
+  status, /data or a message; a hook answered 404/410 is kept as an 8-bit
+  salted fingerprint.
+- The scene trigger is never fired by a scene action; the inbound handler
+  never sends.
+- Manifest keys (config, button, scene actions and trigger, webhook, fields,
+  outputs) are forever.
+- Docs, README, TODO.md, i18n follow the code.
 
 ## Rules
 
@@ -56,8 +72,8 @@ test/                             node --test, against the SDK's fake Gladys (in
   writable volume. Never log tokens, passwords or API keys.
 - **Versions belong to the Release workflow** (Actions → Release). Never edit
   `version` in `package.json` or in the manifest, nor the `docker_image` tag,
-  by hand — except on the README's hand-pushed tag path, which bumps all three
-  together before tagging. `test/manifest.test.js` checks they agree.
+  by hand — except for a hand-pushed release tag, which bumps all three together
+  before tagging (0.1.0 was set that way when leaving the template). `test/manifest.test.js` checks they agree.
 - **Changelog.** Every user-visible change adds a line under `## [Unreleased]`
   in `CHANGELOG.md` (`### Added`, `Changed`, `Fixed`, `Removed`, `Security`).
   Never write a version heading: the Release workflow moves the section, and it

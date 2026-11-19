@@ -1,177 +1,474 @@
 {
   "manifest_version": 1,
-  "type": "device",
-  "name": "Demo Devices Template",
+  "type": "provider",
+  "name": "Zapier",
   "description": {
-    "en": "Starter template showing sensors, a switch, a dimmable light and a smart plug.",
-    "fr": "Template de démarrage : capteurs, interrupteur, lampe variable et prise connectée."
+    "en": "Unofficial: send scene events to your Zaps, and start scenes from a Zap (Gladys Plus).",
+    "fr": "Non officiel : envoyez des événements de scène à vos Zaps, lancez des scènes depuis un Zap (Plus)."
   },
-  "version": "1.0.0",
-  "docker_image": "ghcr.io/gladysassistant/integration-template-js:1.0.0",
+  "version": "0.1.0",
+  "docker_image": "ghcr.io/lm1lc3n7/gladys-zapier:0.1.0",
   "gladys_version": ">=5.1.0",
-  "cover_image": "https://raw.githubusercontent.com/GladysAssistant/integration-template-js/master/cover.png",
-  "categories": ["lighting", "security", "environment"],
-  "transports": ["local", "cloud"],
+  "cover_image": "https://raw.githubusercontent.com/LM1LC3N7/gladys-zapier/main/cover.png",
+  "categories": ["services", "notifications"],
+  "transports": ["cloud"],
   "config_schema": [
     {
       "key": "intro",
       "type": "section",
-      "label": { "en": "Getting started", "fr": "Pour commencer" },
+      "label": {
+        "en": "Zapier, both ways",
+        "fr": "Zapier, dans les deux sens"
+      },
       "description": {
-        "en": "The demo weather station reads real data from the free Open-Meteo API: pick the coordinates to observe. No account, no API key.",
-        "fr": "La station météo de démonstration lit de vraies données via l'API gratuite Open-Meteo : choisissez les coordonnées à observer. Pas de compte, pas de clé d'API."
+        "en": "Unofficial connector, not affiliated with Zapier. To Zapier: the scene actions \"Send to a Zap\" post an event to the Catch Hook URL of a Zap whose trigger is \"Webhooks by Zapier\" (a premium app: a paid Zapier plan is needed). Each send runs the Zap and uses at least one Zapier task: the caps below stop the module before your plan is used up. Zapier is called only by the scene actions and the test button, never at start nor on a timer. Never tested with a real Zapier account yet.",
+        "fr": "Connecteur non officiel, sans lien avec Zapier. Vers Zapier : les actions de scène « Envoyer à un Zap » postent un événement vers l'URL Catch Hook d'un Zap dont le déclencheur est « Webhooks by Zapier » (une application premium : une offre Zapier payante est nécessaire). Chaque envoi lance le Zap et utilise au moins une tâche Zapier : les plafonds ci-dessous arrêtent le module avant que votre offre soit épuisée. Zapier n'est appelé que par les actions de scène et le bouton de test, jamais au démarrage ni sur une minuterie. Jamais testé avec un vrai compte Zapier pour l'instant."
       },
       "links": [
         {
-          "url": "https://open-meteo.com/en/docs",
-          "label": { "en": "Open-Meteo documentation", "fr": "Documentation Open-Meteo" }
+          "url": "https://help.zapier.com/hc/en-us/articles/8496288690317-Trigger-Zaps-from-webhooks",
+          "label": {
+            "en": "Zapier: trigger Zaps from webhooks",
+            "fr": "Zapier : déclencher des Zaps par webhook"
+          }
+        },
+        {
+          "url": "https://zapier.com/pricing",
+          "label": {
+            "en": "Zapier plans and tasks",
+            "fr": "Offres et tâches Zapier"
+          }
+        },
+        {
+          "url": "https://github.com/LM1LC3N7/gladys-zapier/blob/main/docs/fr.md",
+          "label": {
+            "en": "Guide (French)",
+            "fr": "Guide (français)"
+          }
+        },
+        {
+          "url": "https://github.com/LM1LC3N7/gladys-zapier/blob/main/docs/en.md",
+          "label": {
+            "en": "Guide (English)",
+            "fr": "Guide (anglais)"
+          }
         }
       ]
     },
     {
-      "key": "latitude",
-      "type": "number",
-      "label": { "en": "Latitude", "fr": "Latitude" },
-      "description": {
-        "en": "Latitude used for the demo weather sensor.",
-        "fr": "Latitude utilisée par le capteur météo de démonstration."
+      "key": "hook_1",
+      "type": "secret",
+      "label": {
+        "en": "Catch Hook URL 1",
+        "fr": "URL Catch Hook 1"
       },
-      "placeholder": { "en": "e.g. 48.8566", "fr": "ex. 48.8566" },
-      "required": true,
-      "default": 48.8566,
-      "min": -90,
-      "max": 90
+      "description": {
+        "en": "Kept by Gladys in its database, never shown again, sent only to hooks.zapier.com. Copy it from the trigger \"Webhooks by Zapier\" → \"Catch Hook\" of the Zap (https://hooks.zapier.com/hooks/catch/…/…/). Whoever has this URL can start the Zap: never share it.",
+        "fr": "Gardée par Gladys dans sa base, jamais réaffichée, envoyée seulement à hooks.zapier.com. Copiez-la depuis le déclencheur « Webhooks by Zapier » → « Catch Hook » du Zap (https://hooks.zapier.com/hooks/catch/…/…/). Quiconque a cette URL peut lancer le Zap : ne la partagez jamais."
+      },
+      "required": false
     },
     {
-      "key": "longitude",
-      "type": "number",
-      "label": { "en": "Longitude", "fr": "Longitude" },
-      "description": {
-        "en": "Longitude used for the demo weather sensor.",
-        "fr": "Longitude utilisée par le capteur météo de démonstration."
+      "key": "hook_2",
+      "type": "secret",
+      "label": {
+        "en": "Catch Hook URL 2 (optional)",
+        "fr": "URL Catch Hook 2 (facultative)"
       },
-      "placeholder": { "en": "e.g. 2.3522", "fr": "ex. 2.3522" },
-      "required": true,
-      "default": 2.3522,
-      "min": -180,
-      "max": 180
+      "description": {
+        "en": "Kept by Gladys in its database, never shown again, sent only to hooks.zapier.com. Copy it from the trigger \"Webhooks by Zapier\" → \"Catch Hook\" of the Zap (https://hooks.zapier.com/hooks/catch/…/…/). Whoever has this URL can start the Zap: never share it.",
+        "fr": "Gardée par Gladys dans sa base, jamais réaffichée, envoyée seulement à hooks.zapier.com. Copiez-la depuis le déclencheur « Webhooks by Zapier » → « Catch Hook » du Zap (https://hooks.zapier.com/hooks/catch/…/…/). Quiconque a cette URL peut lancer le Zap : ne la partagez jamais."
+      },
+      "required": false
     },
     {
-      "key": "unit",
-      "type": "select",
-      "label": { "en": "Temperature unit", "fr": "Unité de température" },
+      "key": "hook_3",
+      "type": "secret",
+      "label": {
+        "en": "Catch Hook URL 3 (optional)",
+        "fr": "URL Catch Hook 3 (facultative)"
+      },
+      "description": {
+        "en": "Kept by Gladys in its database, never shown again, sent only to hooks.zapier.com. Copy it from the trigger \"Webhooks by Zapier\" → \"Catch Hook\" of the Zap (https://hooks.zapier.com/hooks/catch/…/…/). Whoever has this URL can start the Zap: never share it.",
+        "fr": "Gardée par Gladys dans sa base, jamais réaffichée, envoyée seulement à hooks.zapier.com. Copiez-la depuis le déclencheur « Webhooks by Zapier » → « Catch Hook » du Zap (https://hooks.zapier.com/hooks/catch/…/…/). Quiconque a cette URL peut lancer le Zap : ne la partagez jamais."
+      },
+      "required": false
+    },
+    {
+      "key": "max_sends_per_day",
+      "type": "number",
+      "label": {
+        "en": "Maximum tasks over 24 hours",
+        "fr": "Nombre maximal de tâches sur 24 heures"
+      },
+      "description": {
+        "en": "Counted by the module before each send, kept across restarts: one task per Zap the hook starts (1 to 2000). Beyond, a send is refused.",
+        "fr": "Comptées par le module avant chaque envoi, gardées au redémarrage : une tâche par Zap que le hook lance (de 1 à 2000). Au-delà, un envoi est refusé."
+      },
       "required": false,
-      "default": "celsius",
-      "options": [
-        { "value": "celsius", "label": { "en": "Celsius", "fr": "Celsius" } },
-        { "value": "fahrenheit", "label": { "en": "Fahrenheit", "fr": "Fahrenheit" } }
-      ]
+      "default": 20,
+      "min": 1,
+      "max": 2000
     },
     {
-      "key": "poll_frequency",
+      "key": "max_sends_per_month",
       "type": "number",
-      "label": { "en": "Refresh interval (s)", "fr": "Intervalle de rafraîchissement (s)" },
+      "label": {
+        "en": "Maximum tasks over 30 days",
+        "fr": "Nombre maximal de tâches sur 30 jours"
+      },
       "description": {
-        "en": "How often sensors are polled, in seconds (one minute minimum).",
-        "fr": "Fréquence d'interrogation des capteurs, en secondes (une minute minimum)."
+        "en": "A rolling 30 days, not your Zapier billing month: set it below the tasks of your plan, minus what your other Zaps use (1 to 50000).",
+        "fr": "Sur 30 jours glissants, pas votre mois de facturation Zapier : réglez-le sous les tâches de votre offre, moins ce qu'utilisent vos autres Zaps (de 1 à 50000)."
       },
       "required": false,
-      "default": 300,
-      "min": 60,
-      "max": 3600
+      "default": 500,
+      "min": 1,
+      "max": 50000
+    },
+    {
+      "key": "inbound",
+      "type": "section",
+      "label": {
+        "en": "From Zapier to Gladys (Gladys Plus)",
+        "fr": "De Zapier vers Gladys (Gladys Plus)"
+      },
+      "description": {
+        "en": "Needs Gladys Plus: without it, only the sends to Zapier work. Link Gladys Plus and paste your Open API key in the \"Gladys Plus webhooks\" block: Gladys then shows the public URL to use in a Zap with the action \"Webhooks by Zapier\" → \"POST\" (Payload Type json, data event = my_event, value1, value2, value3, and secret if you set one below). Your scenes then use the trigger \"Event received from Zapier\". That URL is a secret too. An event received never sends anything to Zapier; a scene that answers it by sending to a Zap that calls Gladys again is a loop: the module stops sending for 30 minutes after 3 such rounds.",
+        "fr": "Nécessite Gladys Plus : sans lui, seuls les envois vers Zapier marchent. Liez Gladys Plus et collez votre clé Open API dans le bloc « Webhooks Gladys Plus » : Gladys affiche alors l'URL publique à utiliser dans un Zap avec l'action « Webhooks by Zapier » → « POST » (Payload Type json, data event = mon_evenement, value1, value2, value3, et secret si vous en saisissez un ci-dessous). Vos scènes utilisent ensuite le déclencheur « Événement reçu de Zapier ». Cette URL est un secret elle aussi. Un événement reçu n'envoie jamais rien vers Zapier ; une scène qui y répond en envoyant à un Zap qui rappelle Gladys forme une boucle : le module arrête ses envois 30 minutes après 3 allers-retours."
+      }
+    },
+    {
+      "key": "inbound_secret",
+      "type": "secret",
+      "label": {
+        "en": "Shared secret of the events received (optional)",
+        "fr": "Secret partagé des événements reçus (facultatif)"
+      },
+      "description": {
+        "en": "Kept by Gladys in its database, never shown again, never sent. When set (8 to 200 characters, no space), an event received is accepted only if its data carries \"secret\" with this value.",
+        "fr": "Gardé par Gladys dans sa base, jamais réaffiché, jamais envoyé. S'il est saisi (8 à 200 caractères, sans espace), un événement reçu n'est accepté que si ses données portent « secret » avec cette valeur."
+      },
+      "required": false
     }
   ],
   "actions": [
     {
-      "key": "test_weather",
-      "label": { "en": "Test the weather provider", "fr": "Tester le fournisseur météo" },
-      "timeout_seconds": 30
-    },
-    {
-      "key": "identify",
-      "label": { "en": "Identify a device", "fr": "Identifier un appareil" },
+      "key": "send_test",
+      "timeout_seconds": 20,
+      "label": {
+        "en": "Send a test event",
+        "fr": "Envoyer un événement de test"
+      },
+      "description": {
+        "en": "Posts the event \"gladys_test\" (value1 = Gladys, value2 = test, test = true) to the Catch Hook chosen: the Zap runs and the task counts against the caps. Also says whether events can come from Zapier.",
+        "fr": "Poste l'événement « gladys_test » (value1 = Gladys, value2 = test, test = true) vers le Catch Hook choisi : le Zap s'exécute et la tâche compte dans les plafonds. Dit aussi si des événements peuvent venir de Zapier."
+      },
       "fields": [
         {
-          "key": "device",
+          "key": "zap",
           "type": "select",
-          "source": "devices",
-          "label": { "en": "Device", "fr": "Appareil" },
-          "required": true
+          "label": {
+            "en": "Zap (Catch Hook)",
+            "fr": "Zap (Catch Hook)"
+          },
+          "required": true,
+          "default": "1",
+          "options": [
+            {
+              "value": "1",
+              "label": {
+                "en": "Catch Hook 1",
+                "fr": "Catch Hook 1"
+              }
+            },
+            {
+              "value": "2",
+              "label": {
+                "en": "Catch Hook 2",
+                "fr": "Catch Hook 2"
+              }
+            },
+            {
+              "value": "3",
+              "label": {
+                "en": "Catch Hook 3",
+                "fr": "Catch Hook 3"
+              }
+            }
+          ]
         }
       ]
     }
   ],
+  "webhooks": [
+    {
+      "key": "inbound",
+      "label": {
+        "en": "Events from Zapier",
+        "fr": "Événements de Zapier"
+      },
+      "mode": "fire_and_forget"
+    }
+  ],
   "scene_triggers": [
     {
-      "key": "motion_detected",
-      "label": { "en": "Motion detected", "fr": "Mouvement détecté" },
+      "key": "zap_received",
+      "label": {
+        "en": "Event received from Zapier",
+        "fr": "Événement reçu de Zapier"
+      },
       "description": {
-        "en": "A demo motion sensor saw a person or an animal move.",
-        "fr": "Un détecteur de démonstration a vu bouger une personne ou un animal."
+        "en": "A Zap (or any HTTP client holding the Gladys Plus URL) posted an event name to the inbound webhook.",
+        "fr": "Un Zap (ou tout client HTTP qui a l'URL Gladys Plus) a posté un nom d'événement vers le webhook entrant."
       },
       "fields": [
         {
-          "key": "device",
-          "type": "select",
-          "source": "devices",
-          "label": { "en": "Sensor", "fr": "Détecteur" }
-        },
-        {
-          "key": "target",
-          "type": "multi_select",
-          "label": { "en": "What moved", "fr": "Ce qui a bougé" },
-          "options": [
-            { "value": "person", "label": { "en": "Person", "fr": "Personne" } },
-            { "value": "animal", "label": { "en": "Animal", "fr": "Animal" } }
-          ]
+          "key": "event",
+          "type": "string",
+          "required": false,
+          "label": {
+            "en": "Event name (empty: any)",
+            "fr": "Nom de l'événement (vide : tous)"
+          }
         }
       ],
       "variables": [
         {
-          "key": "target",
+          "key": "event",
           "type": "string",
-          "label": { "en": "What moved", "fr": "Ce qui a bougé" }
+          "label": {
+            "en": "Event name",
+            "fr": "Nom de l'événement"
+          }
+        },
+        {
+          "key": "value1",
+          "type": "string",
+          "label": {
+            "en": "value1",
+            "fr": "value1"
+          }
+        },
+        {
+          "key": "value2",
+          "type": "string",
+          "label": {
+            "en": "value2",
+            "fr": "value2"
+          }
+        },
+        {
+          "key": "value3",
+          "type": "string",
+          "label": {
+            "en": "value3",
+            "fr": "value3"
+          }
+        },
+        {
+          "key": "payload",
+          "type": "string",
+          "label": {
+            "en": "Other fields (JSON)",
+            "fr": "Autres champs (JSON)"
+          }
         }
       ]
     }
   ],
   "scene_actions": [
     {
-      "key": "identify_device",
-      "label": { "en": "Identify a device", "fr": "Identifier un appareil" },
-      "description": {
-        "en": "Make a device signal itself (the demo light blinks).",
-        "fr": "Fait se signaler un appareil (la lampe de démonstration clignote)."
+      "key": "send_event",
+      "label": {
+        "en": "Send to a Zap",
+        "fr": "Envoyer à un Zap"
       },
-      "timeout_seconds": 15,
+      "description": {
+        "en": "Posts the event and up to three values to the Catch Hook of the Zap chosen: the Zap runs (at least one Zapier task, counted against the caps). Not tried again when Zapier does not answer.",
+        "fr": "Poste l'événement et jusqu'à trois valeurs vers le Catch Hook du Zap choisi : le Zap s'exécute (au moins une tâche Zapier, comptée dans les plafonds). Pas de nouvel essai si Zapier ne répond pas."
+      },
+      "timeout_seconds": 45,
       "fields": [
         {
-          "key": "device",
+          "key": "zap",
           "type": "select",
-          "source": "devices",
-          "label": { "en": "Device", "fr": "Appareil" },
-          "required": true
+          "label": {
+            "en": "Zap (Catch Hook)",
+            "fr": "Zap (Catch Hook)"
+          },
+          "required": true,
+          "default": "1",
+          "options": [
+            {
+              "value": "1",
+              "label": {
+                "en": "Catch Hook 1",
+                "fr": "Catch Hook 1"
+              }
+            },
+            {
+              "value": "2",
+              "label": {
+                "en": "Catch Hook 2",
+                "fr": "Catch Hook 2"
+              }
+            },
+            {
+              "value": "3",
+              "label": {
+                "en": "Catch Hook 3",
+                "fr": "Catch Hook 3"
+              }
+            }
+          ]
+        },
+        {
+          "key": "event",
+          "type": "string",
+          "required": true,
+          "label": {
+            "en": "Event name",
+            "fr": "Nom de l'événement"
+          },
+          "placeholder": {
+            "en": "door_opened",
+            "fr": "porte_ouverte"
+          }
+        },
+        {
+          "key": "value1",
+          "type": "string",
+          "required": false,
+          "label": {
+            "en": "value1",
+            "fr": "value1"
+          }
+        },
+        {
+          "key": "value2",
+          "type": "string",
+          "required": false,
+          "label": {
+            "en": "value2",
+            "fr": "value2"
+          }
+        },
+        {
+          "key": "value3",
+          "type": "string",
+          "required": false,
+          "label": {
+            "en": "value3",
+            "fr": "value3"
+          }
         }
       ],
       "outputs": [
         {
-          "key": "signalled",
-          "type": "boolean",
-          "label": { "en": "Device signalled", "fr": "Appareil signalé" }
+          "key": "request_id",
+          "type": "string",
+          "label": {
+            "en": "Zapier request id",
+            "fr": "Identifiant de requête Zapier"
+          }
+        },
+        {
+          "key": "tasks",
+          "type": "number",
+          "label": {
+            "en": "Tasks counted",
+            "fr": "Tâches comptées"
+          }
         }
       ]
-    }
-  ],
-  "widgets": [
+    },
     {
-      "key": "demo_status",
-      "label": { "en": "Demo status", "fr": "État de la démo" },
-      "description": {
-        "en": "Live temperature and plug power, plug connection and observed location.",
-        "fr": "Température et puissance en direct, connexion de la prise, position observée."
+      "key": "send_json",
+      "label": {
+        "en": "Send JSON to a Zap",
+        "fr": "Envoyer du JSON à un Zap"
       },
-      "icon": "activity",
-      "action_timeout_seconds": 15
+      "description": {
+        "en": "Same, with a JSON object (8 KB at most) whose keys become fields of the Zap. Scene variables ({{...}}) are resolved first.",
+        "fr": "Pareil, avec un objet JSON (8 Ko au plus) dont les clés deviennent des champs du Zap. Les variables de scène ({{...}}) sont résolues d'abord."
+      },
+      "timeout_seconds": 45,
+      "fields": [
+        {
+          "key": "zap",
+          "type": "select",
+          "label": {
+            "en": "Zap (Catch Hook)",
+            "fr": "Zap (Catch Hook)"
+          },
+          "required": true,
+          "default": "1",
+          "options": [
+            {
+              "value": "1",
+              "label": {
+                "en": "Catch Hook 1",
+                "fr": "Catch Hook 1"
+              }
+            },
+            {
+              "value": "2",
+              "label": {
+                "en": "Catch Hook 2",
+                "fr": "Catch Hook 2"
+              }
+            },
+            {
+              "value": "3",
+              "label": {
+                "en": "Catch Hook 3",
+                "fr": "Catch Hook 3"
+              }
+            }
+          ]
+        },
+        {
+          "key": "event",
+          "type": "string",
+          "required": true,
+          "label": {
+            "en": "Event name",
+            "fr": "Nom de l'événement"
+          }
+        },
+        {
+          "key": "payload",
+          "type": "string",
+          "required": true,
+          "label": {
+            "en": "JSON object",
+            "fr": "Objet JSON"
+          },
+          "placeholder": {
+            "en": "{\"temperature\": \"{{0.0.last_value}}\"}",
+            "fr": "{\"temperature\": \"{{0.0.last_value}}\"}"
+          }
+        }
+      ],
+      "outputs": [
+        {
+          "key": "request_id",
+          "type": "string",
+          "label": {
+            "en": "Zapier request id",
+            "fr": "Identifiant de requête Zapier"
+          }
+        },
+        {
+          "key": "tasks",
+          "type": "number",
+          "label": {
+            "en": "Tasks counted",
+            "fr": "Tâches comptées"
+          }
+        }
+      ]
     }
   ]
 }

@@ -1,67 +1,94 @@
-# Template de démonstration
+# Zapier pour Gladys Assistant
 
-Ceci est la documentation utilisateur de l'intégration. Gladys ré-héberge ce
-fichier et affiche un lien **Documentation** permanent vers lui dans l'écran
-de configuration (dans la langue de l'utilisateur, avec l'anglais en repli) —
-c'est au moment de configurer que l'utilisateur en a le plus besoin. Gardez
-les courtes indications d'accueil dans les blocs `section` du `config_schema`
-du manifest ; mettez ici le pas-à-pas détaillé (captures d'écran, dépannage…).
+Intégration non officielle, sans lien avec Zapier. Elle n'a encore jamais été testée avec un vrai
+compte Zapier : dites-nous comment ça se passe.
 
-## Ce que vous obtenez
+## Ce qu'elle fait
 
-Six appareils de démonstration apparaissent après l'installation : une
-station météo (vraies données Open-Meteo), un interrupteur, une lampe
-variable, une prise connectée avec mesure de puissance, un détecteur de
-mouvement et une caméra.
+- **De Gladys vers Zapier** : les actions de scène **Envoyer à un Zap** et **Envoyer du JSON à un
+  Zap** postent un événement vers l'URL _Catch Hook_ d'un Zap. Le Zap s'exécute alors avec les
+  champs `event`, `value1`, `value2`, `value3` (ou les clés de votre objet JSON), `source`
+  (`gladys`) et `sent_at` (date ISO).
+- **De Zapier vers Gladys** (nécessite **Gladys Plus**) : un Zap poste vers l'URL Gladys Plus de
+  l'intégration, et vos scènes démarrent sur le déclencheur **Événement reçu de Zapier**, avec les
+  variables `event`, `value1`, `value2`, `value3` et `payload` (les autres champs, en JSON).
 
-## Configuration
+Zapier n'est appelé que par les deux actions de scène et le bouton **Envoyer un événement de
+test** : jamais au démarrage, jamais sur une minuterie, jamais parce qu'un événement a été reçu.
 
-1. Ouvrez l'onglet **Configuration** de l'intégration.
-2. Renseignez la **latitude** et la **longitude** que la station météo de
-   démonstration doit observer (Paris par défaut), et choisissez votre unité
-   de température. L'**intervalle de rafraîchissement** règle la fréquence
-   de lecture de la station météo et de la puissance de la prise : toutes
-   les 5 minutes par défaut, toutes les minutes au plus.
-3. Enregistrez : les appareils apparaissent dans l'onglet **Découverte**,
-   prêts à être ajoutés.
+## Coûts : les tâches Zapier
 
-Le réglage **Préférer la connexion locale** pilote la prise de
-démonstration : elle affiche en badge le canal réellement utilisé (local ou
-cloud), avec un point orange quand elle fonctionne en mode dégradé (local
-refusé, bascule cloud).
+« Webhooks by Zapier » est une application premium : il faut une offre Zapier payante. **Chaque
+envoi lance le Zap et utilise au moins une tâche Zapier** (une par étape d'action exécutée). Pour
+protéger votre offre, le module compte **une tâche par Zap lancé** et refuse un envoi au-delà de
+ses plafonds :
 
-## Actions
+- **Nombre maximal de tâches sur 24 heures** (de 1 à 2000, 20 par défaut) ;
+- **Nombre maximal de tâches sur 30 jours** (de 1 à 50000, 500 par défaut) : 30 jours glissants, pas
+  votre mois de facturation Zapier ; réglez-le sous les tâches de votre offre, moins ce
+  qu'utilisent vos autres Zaps ;
+- **10 envois par minute** au plus, quels que soient les plafonds.
 
-- **Tester le fournisseur météo** — effectue une requête en direct vers
-  Open-Meteo et affiche la température et l'humidité actuelles sous le
-  bouton.
-- **Identifier un appareil** — choisissez un de vos appareils dans la liste
-  et il se signale (la lampe de démonstration « clignote » dans les logs).
+Un envoi est compté, et le décompte enregistré dans `/data`, **avant** que sa requête parte (pas
+d'enregistrement, pas de requête) : le décompte survit à un redémarrage. Il n'est rendu que si
+Zapier ne l'a sûrement pas pris (réponse 4xx, 429, redirection, nom ou connexion refusés). Un envoi
+sans réponse claire (délai dépassé, connexion coupée, 5xx) reste compté et **n'est pas retenté** :
+un second essai pourrait lancer le Zap deux fois. Le module ne compte que ses propres envois ; votre
+tableau de bord Zapier montre les vraies tâches.
 
-## Scènes
+## Régler les envois vers Zapier
 
-L'intégration ajoute ses propres cartes à l'éditeur de scènes (Gladys 5.1
-ou plus récent), dans la catégorie **Intégrations** :
+1. Dans Zapier, créez un Zap dont le déclencheur est **Webhooks by Zapier** → **Catch Hook**.
+2. Copiez l'URL affichée par Zapier (`https://hooks.zapier.com/hooks/catch/<compte>/<hook>/`) dans
+   **URL Catch Hook 1** de la configuration de l'intégration (jusqu'à trois Zaps : URL 2 et 3).
+   Zapier documente la réunion des hooks de plusieurs Zaps du même compte par des virgules
+   (`…/catch/123456/zbB61,kzXC4/`) : chaque Zap nommé s'exécute et compte pour une tâche.
+3. Cliquez sur **Envoyer un événement de test** : l'événement `gladys_test` (avec `test: true`)
+   arrive dans le Zap et compte pour une tâche. Construisez ensuite la suite du Zap avec ses champs.
+4. Dans une scène, ajoutez **Envoyer à un Zap** : choisissez le Catch Hook, un nom d'événement (1 à
+   64 lettres, chiffres, `_`, `-`, `.`) et jusqu'à trois valeurs (1000 caractères chacune au plus,
+   jamais coupées : une valeur plus longue fait refuser l'envoi). Sorties pour les actions
+   suivantes : `request_id` (celui de Zapier) et `tasks`.
 
-- **Mouvement détecté** (déclencheur) — lance la scène quand un détecteur
-  de démonstration voit bouger quelque chose. Choisissez éventuellement le
-  détecteur et ce qui a bougé (personne, animal) ; laissés vides, toute
-  détection correspond. Les actions suivantes peuvent lire ce qui a bougé
-  avec `{{triggerEvent.data.target}}`.
-- **Identifier un appareil** (action) — fait se signaler l'appareil choisi.
-  Elle indique si l'appareil a pu se signaler, pour que les actions
-  suivantes puissent en dépendre.
+**L'URL Catch Hook est un secret** : quiconque l'a peut lancer le Zap. Elle est gardée par Gladys
+dans sa base, jamais réaffichée, envoyée seulement à `hooks.zapier.com`, et jamais écrite dans les
+journaux, le statut ni `/data`. Une URL qui n'est pas une URL Catch Hook de Zapier est refusée (et
+jamais réaffichée).
 
-## Tableau de bord
+## Régler les événements venant de Zapier (Gladys Plus)
 
-Ajoutez le widget **État de la démo** à un tableau de bord : il affiche en
-direct la température de la station météo et la puissance de la prise du
-bureau, la connexion utilisée par la prise (en orange si dégradée) et la
-position observée. Son bouton **Identifier la lampe** fait se signaler la
-lampe de démonstration.
+Sans Gladys Plus, seuls les envois vers Zapier marchent ; le statut de l'intégration le dit.
 
-## Dépannage
+1. Liez Gladys Plus et collez votre clé Open API dans le bloc **Webhooks Gladys Plus** de la
+   configuration de l'intégration : Gladys affiche l'URL publique du webhook **Événements de
+   Zapier**. Cette URL est un secret elle aussi.
+2. Dans un Zap, ajoutez l'action **Webhooks by Zapier** → **POST**, URL = cette URL Gladys Plus,
+   _Payload Type_ `json`, _Data_ : `event` = votre nom d'événement, et `value1`, `value2`, `value3`
+   à votre guise. Les autres clés vont dans `payload` (20 clés au plus, 1000 caractères).
+3. Facultatif : saisissez un **secret partagé** (8 à 200 caractères, sans espace) dans la
+   configuration, et ajoutez un champ `secret` de même valeur dans le Zap : un événement qui ne le
+   porte pas est ignoré. Un secret illisible fait refuser tout événement.
+4. Dans une scène, utilisez le déclencheur **Événement reçu de Zapier**, filtré ou non sur le nom
+   de l'événement.
 
-L'intégration journalise tout ce qu'elle fait : consultez les logs de
-l'intégration depuis l'interface Gladys (ou `docker logs` sur l'hôte) avec
-`LOG_LEVEL=debug` pour le détail complet.
+Le module publie 60 événements par minute au plus et ignore un corps de plus de 64 Ko.
+
+## Boucles
+
+Un événement reçu n'envoie jamais rien vers Zapier. Mais une scène lancée par **Événement reçu de
+Zapier** qui envoie à un Zap qui rappelle Gladys tournerait en boucle et consommerait des tâches.
+Le module surveille les envois partis moins de 15 s après un événement reçu : **après 3 d'entre eux
+en 5 minutes, le suivant est refusé et tous les envois s'arrêtent 30 minutes** (gardé au
+redémarrage). Corrigez la scène, puis enregistrez la configuration pour reprendre aussitôt.
+
+## Pauses et refus
+
+- **429** (Zapier demande de ralentir) : aucun envoi pendant son `Retry-After`, de 60 s à 6 h.
+- **5xx** : aucun envoi pendant 60 s, doublé à chaque nouvel échec, 6 h au plus.
+- **404 ou 410** (Zapier ne connaît pas ce hook : Zap supprimé ou URL changée) : les scènes
+  n'utilisent plus ce hook. Son empreinte de 8 bits est gardée dans `/data` ; coller une autre URL
+  la lève, un succès du bouton de test aussi. Une nouvelle URL saisie pendant l'arrêt de
+  l'intégration partage cette empreinte une fois sur 256 : cliquez alors sur le bouton de test.
+- **401/403** ne sont pas pris pour un refus du hook.
+- `/data` illisible : rien n'est envoyé (les tâches utilisées sont inconnues) ; relu toutes les
+  10 s, jamais écrasé.
