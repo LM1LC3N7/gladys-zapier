@@ -43,10 +43,12 @@
   retry, `/data` unreadable ≠ empty).
 - **Three Catch Hook slots**, all optional (receive only is possible with Gladys Plus). Strict URL
   form `https://hooks.zapier.com/hooks/catch/<digits>/<letters and digits, commas>/`: anything
-  else is refused, never echoed. A hook joining N Zaps counts N tasks per send.
+  else is refused, never echoed. A hook joining N Zaps counts N runs per send. The caps count Zap runs, not tasks (Zapier
+  bills a task per action step): the docs say to divide the plan by the action steps.
 - **Caps**: tasks over a rolling 24 hours (1 to 2000, 20 by default) and a rolling 30 days (1 to
   50000, 500 by default), plus 10
-  sends per minute. Rolling windows on the monotonic clock, dated by the wall clock in `/data`
+  requests per minute (given back or not), and a pause doubled from 60 s after 3 refusals (4xx,
+  redirect) in a row. Rolling windows on the monotonic clock, dated by the wall clock in `/data`
   only (a clock set back keeps the count longer, never shorter).
 - **No retry**, ever: a timeout, a cut connection or a 5xx may have run the Zap. A 4xx, a 429, a
   redirect (never followed), a refused name or connection give the task back.
@@ -58,15 +60,18 @@
   trigger because of an action. For the loops a user can build (trigger → send → Zap → Gladys), a
   send leaving less than 15 s after an event received is "reactive"; a fourth reactive send within
   5 minutes is refused and every send stops for 30 minutes (kept in `/data`), lifted by saving the
-  configuration. At most 3 tasks are lost to a loop. Not a pause on every send after an event: a
+  configuration. Up to 3 runs per Zap of the hook are lost before the stop; a scene that waits
+  15 s or more escapes the guard (only the caps stop it), said in the docs. Not a pause on every send after an event: a
   scene may answer a Zap once.
 - **Inbound**: `fire_and_forget`; JSON, form or query; keys kept in a `Map` (no prototype
   pollution); body ≤ 64 KB, values cut at 1000 characters (the core's limit for an event; the
-  sends refuse instead of cutting); other keys in `payload` (20 at most). Optional shared secret
+  sends refuse instead of cutting); other keys in `payload` (20 at most, a key that would pass 1000 characters left out so the
+  JSON always parses). The per-minute bound counts accepted events only; refusals are logged once
+  per minute. Optional shared secret
   (8 to 200 printable characters) compared in constant time; a secret that does not read refuses
   every event (never accepts without it). 60 events per minute at most. The Gladys Plus URL is
   never shown by the module (the core's block shows it).
 - **Status**: connected when at least one usable hook exists, or receive only with Gladys Plus;
-  shows the tasks used over both windows, the Gladys Plus state, refused hooks, pauses.
+  shows the Zap runs counted over both windows, the Gladys Plus state, refused hooks, pauses.
 - **Button budget** 18 s from the click, scene budget 25 s (manifest 45 s, Gladys' 15 s wait for
   the connection included); one request at a time, a queue of 10.

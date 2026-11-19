@@ -180,7 +180,7 @@ test('the button, the scene actions, the trigger and the webhook match the handl
       scene.outputs.map((o) => [o.key, o.type]),
       [
         ['request_id', 'string'],
-        ['tasks', 'number'],
+        ['zap_runs', 'number'],
       ],
     );
     for (const f of scene.fields) assert.notEqual(f.type, 'secret');

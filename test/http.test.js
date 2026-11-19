@@ -1,4 +1,5 @@
 import { test } from 'node:test';
+import { createServer } from 'node:http';
 import assert from 'node:assert/strict';
 import { ZapierError, postHook, readBounded, retryAfterMs } from '../src/http.js';
 import { HOOK1, fetchError, json } from './helpers/app.js';
@@ -84,4 +85,21 @@ test('a 2xx: json, or undefined when the body does not read (still a success)', 
   assert.equal((await call(new Response('ok', { status: 200 }))).json, undefined);
   const big = new Response('x'.repeat(40_000), { status: 200 });
   assert.equal((await call(big)).json, undefined);
+});
+
+test('a Zapier that never answers: the request ends at its timeout', async (t) => {
+  const server = createServer(() => {});
+  await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
+  t.after(() => {
+    server.closeAllConnections();
+    server.close();
+  });
+  const local = `http://127.0.0.1:${server.address().port}/hooks/catch/1/a/`;
+  const started = performance.now();
+  await assert.rejects(
+    postHook(local, { event: 'x' }, { fetchImpl: (u, i) => fetch(u, i), timeout: 300 }),
+    { code: 'timeout', sent: 'maybe' },
+  );
+  const took = performance.now() - started;
+  assert.ok(took >= 250 && took < 5000, `${Math.round(took)} ms`);
 });

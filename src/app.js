@@ -21,7 +21,7 @@
 //   - a hook Zapier does not know (404/410) is never sent to again by a
 //     scene: its 8-bit salted fingerprint is kept in /data, lifted by a new URL
 //     or a success of the test button;
-//   - the caps: tasks counted over the last 24 hours and the last 30 days,
+//   - the caps: Zap runs counted over the last 24 hours and the last 30 days,
 //     plus this send (one task per Zap of the hook), must not pass the caps;
 //     at most 10 sends per minute. A send is counted and the count SAVED in
 //     /data before its request leaves (no save, no request), and given back
@@ -72,7 +72,7 @@ import { inboundEvent } from './inbound.js';
 const realTimers = { setTimeout, clearTimeout };
 const CONFIG_RETRY = [5_000, 10_000, 30_000, 60_000, 300_000];
 const REQUEST_ID = /^[A-Za-z0-9-]{1,80}$/;
-const PAUSE_WHY = ['rate_limited', 'server', 'loop'];
+const PAUSE_WHY = ['rate_limited', 'server', 'client', 'loop'];
 
 /** A refused send: nothing left. `code` is a key of T.reason. */
 export class NotSent extends Error {
@@ -130,6 +130,12 @@ export class App {
     this.lastInbound = undefined;
     this.reactive = [];
     this.inboundTimes = [];
+    this.inboundRefusedLog = undefined;
+    this.inboundBurstLog = undefined;
+    /** Requests that left (given back or not): the per-minute bound. */
+    this.sent = [];
+    /** 4xx answers in a row (given back): a growing pause from the third. */
+    this.clientErrors = 0;
     /** Gladys Plus: undefined (not read), or { available, ready }. */
     this.plus = undefined;
     this.queue = Promise.resolve();
@@ -491,9 +497,10 @@ export class App {
     return this.calls.filter((c) => mono - c.mono < window).reduce((sum, c) => sum + c.n, 0);
   }
 
-  /** Sends (requests, not tasks) of the last minute. */
+  /** Requests that left in the last minute, given back or not. */
   sendsLastMinute(mono) {
-    return this.calls.filter((c) => mono - c.mono < MINUTE).length;
+    this.sent = this.sent.filter((at) => mono - at < MINUTE);
+    return this.sent.length;
   }
 
   /** Whether a send at `mono` follows an event received from Zapier. */
@@ -539,18 +546,22 @@ export class App {
 
   /**
    * Sends one event to the Zap of `fields.zap`. Resolves
-   * `{ request_id, tasks }`; throws NotSent when nothing left, or a NotSent
+   * `{ request_id, zap_runs }`; throws NotSent when nothing left, or a NotSent
    * with `maybe` when Zapier may have taken it.
    */
   async send(fields = {}, { json = false, budget = SCENE_BUDGET, test = false } = {}) {
-    const deadline = this.monotonic() + budget;
+    const called = this.monotonic();
+    const deadline = called + budget;
+    // A send is a reply to an event when the scene CALLS it soon after: the
+    // wait in the queue does not take it out of the window.
+    const reactive = this.isReactive(called);
     const config = await this.configForSend();
     const job = App.readFields(fields, config, json);
     await this.dataForSend();
     if (this.waiting >= MAX_QUEUE) throw new NotSent('queue_full');
     this.waiting += 1;
     const gen = this.generation;
-    const run = this.queue.then(() => this.sendOne({ ...job, deadline, gen, test }));
+    const run = this.queue.then(() => this.sendOne({ ...job, deadline, gen, test, reactive }));
     this.queue = run.catch(() => {});
     try {
       return await run;
@@ -560,10 +571,10 @@ export class App {
   }
 
   /** Why nothing may leave now, or undefined. The clock is read once. */
-  blocked({ deadline, gen, slot, hook, test }, mono) {
+  blocked({ deadline, gen, slot, hook, test, reactive }, mono) {
     if (!this.running || gen !== this.generation) return 'stopped';
     if (deadline - mono < SEND_MARGIN) return 'time';
-    if (this.paused(mono)) return this.pause.why === 'loop' ? 'loop' : 'paused';
+    if (this.paused(mono)) return this.pause.why === 'loop' ? 'loop' : `paused_${this.pause.why}`;
     // The configuration may have changed while the job waited for its turn.
     const current = this.config.hooks[slot];
     if (!current || current.url !== hook.url) return 'no_hook';
@@ -573,7 +584,7 @@ export class App {
     if (this.sendsLastMinute(mono) >= MAX_PER_MINUTE) return 'burst';
     if (this.used(mono, DAY) + hook.zaps > this.config.maxPerDay) return 'cap_day';
     if (this.used(mono, MONTH) + hook.zaps > this.config.maxPerMonth) return 'cap_month';
-    if (this.isReactive(mono)) {
+    if (reactive) {
       this.reactive = this.reactive.filter((at) => mono - at < LOOP_SPAN);
       if (this.reactive.length >= LOOP_MAX) {
         this.setPause(LOOP_PAUSE, 'loop', false);
@@ -586,12 +597,17 @@ export class App {
     return undefined;
   }
 
-  async sendOne({ slot, hook, event, extra, deadline, gen, test }) {
+  async sendOne({ slot, hook, event, extra, deadline, gen, test, reactive }) {
     const mono = this.monotonic();
-    const why = this.blocked({ deadline, gen, slot, hook, test }, mono);
-    if (why) throw new NotSent(why);
+    const why = this.blocked({ deadline, gen, slot, hook, test, reactive }, mono);
+    if (why) {
+      const out = new NotSent(why);
+      if (why.startsWith('paused_')) {
+        out.minutes = Math.max(1, Math.ceil((this.pause.untilMono - mono) / 60_000));
+      }
+      throw out;
+    }
     const entry = { mono, wall: this.now(), n: hook.zaps };
-    const reactive = this.isReactive(mono);
     // Counted and saved before the request leaves: a crash after it cannot
     // free the tasks. No save, no request.
     this.calls.push(entry);
@@ -611,6 +627,7 @@ export class App {
     if (deadline - this.monotonic() < SEND_MARGIN - SAVE_TIMEOUT) await giveBack('time');
     const body = { ...extra, event, source: 'gladys', sent_at: new Date(entry.wall).toISOString() };
     if (test) body.test = true;
+    this.sent.push(this.monotonic());
     let answer;
     try {
       answer = await postHook(hook.url, body, { fetchImpl: this.fetchImpl, now: this.now });
@@ -629,14 +646,15 @@ export class App {
     }
     // Answered with a 2xx: Zapier took it, whatever the body says.
     this.pause.streak = 0;
+    this.clientErrors = 0;
     if (this.refused[slot]) delete this.refused[slot];
     await this.save();
     this.publishStatus();
     const id = answer.json?.request_id ?? answer.json?.id;
-    this.logger.info(`Event sent to Catch Hook ${slot} (${hook.zaps} task(s) counted)`);
+    this.logger.info(`Event sent to Catch Hook ${slot} (${hook.zaps} Zap run(s) counted)`);
     return {
       request_id: typeof id === 'string' && REQUEST_ID.test(id) ? id : '',
-      tasks: hook.zaps,
+      zap_runs: hook.zaps,
     };
   }
 
@@ -647,6 +665,8 @@ export class App {
       const j = this.reactive.lastIndexOf(reactiveAt);
       if (j >= 0) this.reactive.splice(j, 1);
     }
+    // The counts shown in the status change with it.
+    this.publishStatus();
   }
 
   /** What a failure changes for the next requests (pause, refusal). */
@@ -658,6 +678,13 @@ export class App {
       this.setPause(err.retryAfter ?? PAUSE_MIN * 2 ** this.pause.streak, 'rate_limited');
     } else if (err.code === 'server') {
       this.setPause(Math.max(err.retryAfter ?? 0, PAUSE_MIN * 2 ** this.pause.streak), 'server');
+    } else if (err.sent === 'no' && err.status >= 300 && err.status < 500) {
+      // A Zap refusing every send (a 4xx, a redirect) is not hammered: from
+      // the third in a row, a pause of 60 s doubled each time, 6 h at most.
+      this.clientErrors += 1;
+      if (this.clientErrors >= 3) {
+        this.setPause(PAUSE_MIN * 2 ** Math.min(this.clientErrors - 3, 10), 'client', false);
+      }
     }
   }
 
@@ -669,7 +696,9 @@ export class App {
       return await this.send(fields, { json, budget: SCENE_BUDGET });
     } catch (err) {
       if (err instanceof NotSent) {
-        throw sceneError(reasonMessage(err.code, err.maybe ? T.prefix.maybe : T.prefix.nothing));
+        throw sceneError(
+          reasonMessage(err.code, err.maybe ? T.prefix.maybe : T.prefix.nothing, err.minutes),
+        );
       }
       throw err;
     }
@@ -684,10 +713,10 @@ export class App {
         { zap, event: 'gladys_test', value1: 'Gladys', value2: 'test' },
         { budget: BUTTON_BUDGET, test: true },
       );
-      message = T.test.ok(zap, out.tasks);
+      message = T.test.ok(zap, out.zap_runs);
     } catch (err) {
       if (!(err instanceof NotSent)) throw err;
-      message = reasonMessage(err.code, err.maybe ? T.prefix.maybe : T.prefix.nothing);
+      message = reasonMessage(err.code, err.maybe ? T.prefix.maybe : T.prefix.nothing, err.minutes);
     }
     return join(message, this.inboundText());
   }
@@ -703,20 +732,28 @@ export class App {
       this.logger.warn('Inbound request ignored: configuration not read yet');
       return;
     }
-    this.inboundTimes = this.inboundTimes.filter((at) => mono - at < MINUTE);
-    if (this.inboundTimes.length >= MAX_INBOUND_PER_MINUTE) {
-      this.logger.warn('Inbound request ignored: more than 60 in a minute');
-      return;
-    }
-    this.inboundTimes.push(mono);
     const result = inboundEvent(request, {
       secret: config.inboundSecret,
       locked: config.inboundLocked,
     });
     if (!result.ok) {
-      this.logger.warn(`Inbound request ignored: ${result.reason}`);
+      // Refusals have their own count: they never take the room of the
+      // accepted events, and the log says it once per minute at most.
+      if (this.inboundRefusedLog === undefined || mono - this.inboundRefusedLog >= MINUTE) {
+        this.inboundRefusedLog = mono;
+        this.logger.warn(`Inbound request ignored: ${result.reason} (once per minute in the log)`);
+      }
       return;
     }
+    this.inboundTimes = this.inboundTimes.filter((at) => mono - at < MINUTE);
+    if (this.inboundTimes.length >= MAX_INBOUND_PER_MINUTE) {
+      if (this.inboundBurstLog === undefined || mono - this.inboundBurstLog >= MINUTE) {
+        this.inboundBurstLog = mono;
+        this.logger.warn('Inbound events ignored: more than 60 in a minute');
+      }
+      return;
+    }
+    this.inboundTimes.push(mono);
     // Before publishing: a scene the event starts sends right after.
     this.lastInbound = mono;
     try {

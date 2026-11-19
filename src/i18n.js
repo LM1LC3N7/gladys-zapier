@@ -51,6 +51,10 @@ export const T = {
           en: 'Zapier asked to slow down (429)',
           fr: 'Zapier a demandé de ralentir (429)',
         },
+        client: {
+          en: 'Zapier refused several sends in a row (4xx)',
+          fr: "Zapier a refusé plusieurs envois d'affilée (4xx)",
+        },
         loop: {
           en: 'Probable loop (a Zap calling Gladys, a scene sending back to Zapier)',
           fr: 'Boucle probable (un Zap qui appelle Gladys, une scène qui renvoie vers Zapier)',
@@ -69,16 +73,16 @@ export const T = {
       };
     },
     ready: ({ slots, day, maxDay, month, maxMonth }) => ({
-      en: `Ready to send to Catch Hook ${list(slots)}. Tasks used by this module: ${n(day, 'en')} of ${n(maxDay, 'en')} over 24 hours, ${n(month, 'en')} of ${n(maxMonth, 'en')} over 30 days.`,
-      fr: `Prêt à envoyer vers le Catch Hook ${list(slots)}. Tâches utilisées par ce module : ${n(day, 'fr')} sur ${n(maxDay, 'fr')} sur 24 heures, ${n(month, 'fr')} sur ${n(maxMonth, 'fr')} sur 30 jours.`,
+      en: `Ready to send to Catch Hook ${list(slots)}. Zap runs counted by this module: ${n(day, 'en')} of ${n(maxDay, 'en')} over 24 hours, ${n(month, 'en')} of ${n(maxMonth, 'en')} over 30 days.`,
+      fr: `Prêt à envoyer vers le Catch Hook ${list(slots)}. Exécutions de Zap comptées par ce module : ${n(day, 'fr')} sur ${n(maxDay, 'fr')} sur 24 heures, ${n(month, 'fr')} sur ${n(maxMonth, 'fr')} sur 30 jours.`,
     }),
     receive_only: {
       en: 'No Catch Hook URL: nothing is sent to Zapier.',
       fr: "Aucune URL Catch Hook : rien n'est envoyé à Zapier.",
     },
     data_unreadable: {
-      en: '/data is unreadable: nothing is sent to Zapier (the tasks used are unknown). Read again every 10 s.',
-      fr: "/data est illisible : rien n'est envoyé à Zapier (les tâches utilisées sont inconnues). Relu toutes les 10 s.",
+      en: '/data is unreadable: nothing is sent to Zapier (the Zap runs counted are unknown). Read again every 10 s.',
+      fr: "/data est illisible : rien n'est envoyé à Zapier (les exécutions de Zap comptées sont inconnues). Relu toutes les 10 s.",
     },
     data_unwritable: {
       en: ' /data could not be written at the last save: a send is refused while its count cannot be kept.',
@@ -89,8 +93,8 @@ export const T = {
   prefix: {
     nothing: { en: 'Nothing sent to Zapier', fr: 'Rien envoyé à Zapier' },
     maybe: {
-      en: 'Sent to Zapier without a clear answer (the Zap may have run and used a task; not tried again)',
-      fr: 'Envoyé à Zapier sans réponse claire (le Zap a pu s’exécuter et utiliser une tâche ; pas de nouvel essai)',
+      en: 'Sent to Zapier without a clear answer (the Zap may have run; counted, not tried again)',
+      fr: 'Envoyé à Zapier sans réponse claire (le Zap a pu s’exécuter ; compté, pas de nouvel essai)',
     },
   },
 
@@ -127,8 +131,8 @@ export const T = {
     },
     data_pending: { en: '/data is not read yet', fr: "/data n'est pas encore lu" },
     data_unreadable: {
-      en: '/data is unreadable (the tasks used are unknown)',
-      fr: '/data est illisible (les tâches utilisées sont inconnues)',
+      en: '/data is unreadable (the Zap runs counted are unknown)',
+      fr: '/data est illisible (les exécutions de Zap comptées sont inconnues)',
     },
     data_unwritable: {
       en: 'the count could not be saved in /data',
@@ -140,7 +144,18 @@ export const T = {
     },
     time: { en: 'no time left for the request', fr: 'plus le temps de faire la requête' },
     stopped: { en: 'the integration stopped', fr: "l'intégration s'est arrêtée" },
-    paused: { en: 'Zapier asked for a pause', fr: 'Zapier a demandé une pause' },
+    paused_rate_limited: (m) => ({
+      en: `paused after a 429 of Zapier (about ${m} min left)`,
+      fr: `en pause après un 429 de Zapier (encore environ ${m} min)`,
+    }),
+    paused_server: (m) => ({
+      en: `paused after a 5xx of Zapier (about ${m} min left)`,
+      fr: `en pause après un 5xx de Zapier (encore environ ${m} min)`,
+    }),
+    paused_client: (m) => ({
+      en: `paused after several refusals (4xx) in a row (about ${m} min left)`,
+      fr: `en pause après plusieurs refus (4xx) d'affilée (encore environ ${m} min)`,
+    }),
     loop: {
       en: 'probable loop between a Zap and a scene: sends stopped for 30 min (save the configuration to resume)',
       fr: 'boucle probable entre un Zap et une scène : envois arrêtés 30 min (enregistrez la configuration pour reprendre)',
@@ -150,12 +165,12 @@ export const T = {
       fr: 'plus de 10 envois en une minute',
     },
     cap_day: {
-      en: 'the cap of tasks over 24 hours is reached',
-      fr: 'le plafond de tâches sur 24 heures est atteint',
+      en: 'the cap of Zap runs over 24 hours is reached',
+      fr: "le plafond d'exécutions de Zap sur 24 heures est atteint",
     },
     cap_month: {
-      en: 'the cap of tasks over 30 days is reached',
-      fr: 'le plafond de tâches sur 30 jours est atteint',
+      en: 'the cap of Zap runs over 30 days is reached',
+      fr: "le plafond d'exécutions de Zap sur 30 jours est atteint",
     },
     refused: {
       en: 'Zapier knew no such hook at the last send (404/410)',
@@ -186,9 +201,9 @@ export const T = {
   },
 
   test: {
-    ok: (slot, tasks) => ({
-      en: `Zapier accepted the test event on Catch Hook ${slot} (${tasks} task${tasks > 1 ? 's' : ''} counted). Open the Zap to see it.`,
-      fr: `Zapier a accepté l'événement de test sur le Catch Hook ${slot} (${tasks} tâche${tasks > 1 ? 's' : ''} comptée${tasks > 1 ? 's' : ''}). Ouvrez le Zap pour le voir.`,
+    ok: (slot, runs) => ({
+      en: `Zapier accepted the test event on Catch Hook ${slot} (${runs} Zap run${runs > 1 ? 's' : ''} counted). Open the Zap to see it.`,
+      fr: `Zapier a accepté l'événement de test sur le Catch Hook ${slot} (${runs} exécution${runs > 1 ? 's' : ''} de Zap comptée${runs > 1 ? 's' : ''}). Ouvrez le Zap pour le voir.`,
     }),
   },
 };
@@ -199,8 +214,9 @@ export function sceneError(message) {
 }
 
 /** A reason alone, as a two-language message. */
-export function reasonMessage(code, prefix = T.prefix.nothing) {
-  const r = T.reason[code] ?? T.reason.http;
+export function reasonMessage(code, prefix = T.prefix.nothing, minutes = 1) {
+  const entry = T.reason[code] ?? T.reason.http;
+  const r = typeof entry === 'function' ? entry(minutes) : entry;
   return { en: `${prefix.en}: ${r.en}.`, fr: `${prefix.fr} : ${r.fr}.` };
 }
 

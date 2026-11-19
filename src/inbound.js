@@ -8,7 +8,8 @@
 //   - a JSON object body: { "event": "...", "value1": ..., "secret": "..." };
 //   - a form body (application/x-www-form-urlencoded) with the same keys;
 //   - any other text body is value1 (when the fields have none).
-// Every other key is kept in `payload` (JSON, 20 keys at most). The keys are
+// Every other key is kept in `payload` (a JSON object of 1000 characters and
+// 20 keys at most: a key that does not fit is left out). The keys are
 // kept in a Map: a "__proto__" key is a key like any other.
 // -----------------------------------------------------------------------------
 
@@ -106,13 +107,25 @@ export function inboundEvent(request, { secret = '', locked = false } = {}) {
   }
   const event = typeof fields.get('event') === 'string' ? fields.get('event').trim() : '';
   if (!EVENT_NAME.test(event)) return { ok: false, reason: 'no_event' };
-  const extra = {};
-  let kept = 0;
+  // The other keys, as a JSON object that always parses: a key that would
+  // pass the 1000 characters is left out, never cut in the middle.
+  const parts = [];
+  let size = 2;
   for (const [key, value] of fields) {
     if (RESERVED.has(key)) continue;
-    if (kept >= MAX_EXTRA_KEYS) break;
-    Object.defineProperty(extra, key, { value, enumerable: true, writable: true });
-    kept += 1;
+    if (parts.length >= MAX_EXTRA_KEYS) break;
+    let part;
+    try {
+      const text = JSON.stringify(value);
+      part = text === undefined ? undefined : `${JSON.stringify(key)}:${text}`;
+    } catch {
+      part = undefined;
+    }
+    if (part === undefined) continue;
+    const added = part.length + (parts.length ? 1 : 0);
+    if (size + added > MAX_VALUE) continue;
+    parts.push(part);
+    size += added;
   }
   return {
     ok: true,
@@ -121,7 +134,7 @@ export function inboundEvent(request, { secret = '', locked = false } = {}) {
       value1: clip(fields.get('value1')),
       value2: clip(fields.get('value2')),
       value3: clip(fields.get('value3')),
-      payload: kept > 0 ? clip(extra) : null,
+      payload: parts.length > 0 ? `{${parts.join(',')}}` : null,
     },
   };
 }

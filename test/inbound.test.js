@@ -35,6 +35,13 @@ test('payload: other keys, 20 at most, "__proto__" a plain key', () => {
   const many = Object.fromEntries(Array.from({ length: 40 }, (_, i) => [`k${i}`, i]));
   const m = inboundEvent(post({ event: 'a', ...many }));
   assert.equal(Object.keys(JSON.parse(m.data.payload)).length, 20);
+  // 30 keys of 80 characters: the JSON still parses, the keys that do not fit are left out.
+  const wide = Object.fromEntries(Array.from({ length: 30 }, (_, i) => [`k${i}`, 'v'.repeat(80)]));
+  const w = inboundEvent(post({ event: 'a', ...wide }));
+  assert.ok(w.data.payload.length <= 1000);
+  const parsed = JSON.parse(w.data.payload);
+  assert.ok(Object.keys(parsed).length >= 10);
+  for (const value of Object.values(parsed)) assert.equal(value, 'v'.repeat(80), 'never cut');
   assert.equal(inboundEvent(post({ event: 'a' })).data.payload, null);
   assert.ok(!inboundEvent(post({ event: 'a', secret: 's' })).data.payload);
 });

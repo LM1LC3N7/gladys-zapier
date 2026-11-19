@@ -68,7 +68,7 @@
   {
     "name": "pause ignored",
     "file": "src/app.js",
-    "from": "if (this.paused(mono)) return this.pause.why === 'loop' ? 'loop' : 'paused';",
+    "from": "if (this.paused(mono)) return this.pause.why === 'loop' ? 'loop' : `paused_${this.pause.why}`;",
     "to": ""
   },
   {
@@ -176,7 +176,7 @@
   {
     "name": "extra keys unbounded",
     "file": "src/inbound.js",
-    "from": "if (kept >= MAX_EXTRA_KEYS) break;",
+    "from": "if (parts.length >= MAX_EXTRA_KEYS) break;",
     "to": ""
   },
   {
@@ -232,5 +232,65 @@
     "file": "src/config.js",
     "from": "    else issues.push('bad_secret');",
     "to": "    else inboundSecret = '';"
+  },
+  {
+    "name": "http timeout dropped",
+    "file": "src/http.js",
+    "from": "      signal,\n",
+    "to": ""
+  },
+  {
+    "name": "30-day window read as a day",
+    "file": "src/app.js",
+    "from": "if (age >= MONTH) continue;",
+    "to": "if (age >= DAY) continue;"
+  },
+  {
+    "name": "stop not checked after the save",
+    "file": "src/app.js",
+    "from": "if (!this.running || gen !== this.generation) await giveBack('stopped');",
+    "to": ""
+  },
+  {
+    "name": "lastInbound set before the secret",
+    "file": "src/app.js",
+    "from": "    const result = inboundEvent(request, {",
+    "to": "    this.lastInbound = mono;\n    const result = inboundEvent(request, {"
+  },
+  {
+    "name": "per-minute bound counts accepted only",
+    "file": "src/app.js",
+    "from": "    this.sent.push(this.monotonic());\n",
+    "to": ""
+  },
+  {
+    "name": "no pause after repeated 4xx",
+    "file": "src/app.js",
+    "from": "      if (this.clientErrors >= 3) {",
+    "to": "      if (false) {"
+  },
+  {
+    "name": "4xx series not reset",
+    "file": "src/app.js",
+    "from": "    this.clientErrors = 0;\n    if (this.refused[slot])",
+    "to": "    if (this.refused[slot])"
+  },
+  {
+    "name": "reply judged at the decision",
+    "file": "src/app.js",
+    "from": "    const reactive = this.isReactive(called);",
+    "to": "    const reactive = undefined;"
+  },
+  {
+    "name": "payload cut",
+    "file": "src/inbound.js",
+    "from": "    if (size + added > MAX_VALUE) continue;",
+    "to": ""
+  },
+  {
+    "name": "status not republished on give back",
+    "file": "src/app.js",
+    "from": "    // The counts shown in the status change with it.\n    this.publishStatus();\n",
+    "to": ""
   }
 ]

@@ -8,12 +8,14 @@ Zapier, both ways:
 - **from Zapier** (Gladys Plus): a Zap posts to the Gladys Plus webhook of the integration, and the
   scene trigger **"Event received from Zapier"** starts your scenes.
 
-- Each send uses Zapier tasks: caps in the module (tasks over 24 hours and over 30 days, 10 sends
-  per minute), counted and saved in `/data` before each request, kept across a restart.
+- Each send runs a Zap (Zapier bills a task per action step): caps of Zap runs in the module (over
+  24 hours and over 30 days, 10 requests per minute), counted and saved in `/data` before each
+  request, kept across a restart; a growing pause after 3 refusals (4xx) in a row.
 - A send that may have been taken (timeout, cut connection, 5xx) is never tried again; pauses after
   a 429 or a 5xx; a hook Zapier does not know (404/410) is no longer used by scenes.
-- No loop: an event received never sends anything; sends that keep following received events
-  (3 within 5 minutes) stop every send for 30 minutes.
+- An event received never sends anything. A loop built by a scene (event → send → Zap → Gladys) is
+  stopped for 30 minutes after 3 quick rounds; a scene that waits 15 s or more escapes this guard,
+  only the caps stop it.
 - The Catch Hook URLs, the inbound secret and the values never reach the logs, the status nor
   `/data`.
 - Never tested with a real Zapier account yet.

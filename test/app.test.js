@@ -40,7 +40,7 @@ test('send_event: one POST to the hook, counted and saved before it leaves', asy
   });
   const ack = await b.scene();
   assert.equal(ack.success, true, message(ack));
-  assert.deepEqual(ack.data.outputs, { request_id: 'req-1', tasks: 1 });
+  assert.deepEqual(ack.data.outputs, { request_id: 'req-1', zap_runs: 1 });
   assert.equal(b.api.requests.length, 1);
   const [r] = b.api.requests;
   assert.equal(r.url, HOOK1);
@@ -64,7 +64,7 @@ test('send_event: one POST to the hook, counted and saved before it leaves', asy
 test('a hook naming two Zaps counts two tasks; the slot without URL refuses', async () => {
   const b = await setup({ config: { hook_1: HOOK1, hook_2: HOOK2, max_sends_per_day: 3 } });
   let ack = await b.scene({ zap: '2', event: 'x' });
-  assert.equal(ack.data.outputs.tasks, 2);
+  assert.equal(ack.data.outputs.zap_runs, 2);
   ack = await b.scene({ zap: '2', event: 'x' });
   assert.ok(failed(ack));
   assert.match(message(ack), /24 hours/);
@@ -83,7 +83,7 @@ test('the daily cap frees a task 24 hours after it, never sooner', async () => {
   await b.scene();
   let ack = await b.scene();
   assert.ok(failed(ack));
-  assert.match(message(ack), /Nothing sent to Zapier: the cap of tasks over 24 hours/);
+  assert.match(message(ack), /Nothing sent to Zapier: the cap of Zap runs over 24 hours/);
   await b.wait(DAY - 3 * MINUTE);
   ack = await b.scene();
   assert.ok(failed(ack), 'still within 24 hours of the first');
@@ -127,6 +127,7 @@ test('no save, no request; an unreadable /data refuses and is read again every 1
   assert.match(message(ack), /could not be saved in \/data/);
   assert.equal(b.api.requests.length, 0);
   assert.match(lastStatus(b.gladys).message.en, /could not be written/);
+  assert.match(lastStatus(b.gladys).message.en, /0 of 20 over 24 hours/, 'given back: shown');
   store.failSave = false;
   assert.equal((await b.scene()).success, true);
 
@@ -182,7 +183,7 @@ test('429: a pause of Retry-After bounded to 60 s..6 h, kept across a restart', 
   const a = await setup({ store, handler });
   assert.match(message(await a.scene()), /slow down \(429\)/);
   assert.equal(store.data.calls.length, 0, 'a 429 uses no task');
-  assert.match(message(await a.scene()), /asked for a pause/);
+  assert.match(message(await a.scene()), /paused after a 429 of Zapier \(about 10 min left\)/);
   assert.equal(n, 1);
   assert.match(lastStatus(a.gladys).message.en, /429/);
   await a.wait(5 * MINUTE);
@@ -502,9 +503,9 @@ test('the test button: the event gladys_test, counted, with the inbound state', 
   const ack = await b.gladys.fake.action('send_test', { zap: '2' });
   assert.match(
     ack.data.message.en,
-    /accepted the test event on Catch Hook 2 \(2 tasks counted\).*From Zapier: ready/,
+    /accepted the test event on Catch Hook 2 \(2 Zap runs counted\).*From Zapier: ready/,
   );
-  assert.match(ack.data.message.fr, /tâches comptées/);
+  assert.match(ack.data.message.fr, /exécutions de Zap comptées/);
   const [r] = b.api.requests;
   assert.equal(r.url, HOOK2);
   assert.equal(r.body.event, 'gladys_test');
@@ -594,4 +595,107 @@ test('a hook URL changed while a send waits in the queue: the old URL is not use
     b.api.requests.map((r) => r.url),
     [HOOK1],
   );
+});
+
+test('refusals (4xx) count in the per-minute bound and pause from the third in a row', async () => {
+  let refuse = true;
+  const b = await setup({
+    config: { ...BASE_CONFIG, max_sends_per_day: 2000 },
+    handler: () => (refuse ? json({}, 400) : undefined),
+  });
+  const outs = [];
+  for (let i = 0; i < 30; i += 1) outs.push(message(await b.scene()));
+  assert.equal(b.api.requests.length, 3);
+  assert.match(outs[3], /paused after several refusals \(4xx\) in a row \(about 1 min left\)/);
+  assert.match(lastStatus(b.gladys).message.en, /refused several sends in a row/);
+  await b.wait(61 * SECOND);
+  await b.scene();
+  await b.wait(61 * SECOND);
+  assert.match(message(await b.scene()), /refusals/, 'doubled: 120 s');
+  refuse = false;
+  await b.wait(60 * SECOND);
+  assert.equal((await b.scene()).success, true);
+  assert.equal(b.app.clientErrors, 0, 'a success resets the series');
+});
+
+test('the per-minute bound counts the requests given back too', async () => {
+  let n = 0;
+  const b = await setup({
+    config: { ...BASE_CONFIG, max_sends_per_day: 2000 },
+    // Every other answer is a 400: never three in a row.
+    handler: () => ((n += 1) % 2 ? json({}, 400) : undefined),
+  });
+  for (let i = 0; i < 15; i += 1) await b.scene();
+  assert.equal(b.api.requests.length, 10);
+  assert.equal(b.store.data.calls.length, 5, 'only the accepted ones are counted');
+});
+
+test('the 30-day cap holds after a restart two days later', async () => {
+  const store = createMemoryStore();
+  const config = { ...BASE_CONFIG, max_sends_per_month: 3 };
+  const a = await setup({ store, config });
+  for (let i = 0; i < 3; i += 1) assert.equal((await a.scene()).success, true);
+  await a.app.stop();
+  const b = await setup({ store, config, now: Date.parse('2026-11-17T09:00:00Z') });
+  assert.match(message(await b.scene()), /30 days/);
+  assert.equal(b.api.requests.length, 0);
+});
+
+test('stop() during the save before a request: nothing leaves', async () => {
+  const store = createMemoryStore();
+  const b = await setup({ store });
+  let open;
+  const gate = new Promise((resolve) => (open = resolve));
+  const save = store.save.bind(store);
+  store.save = async (data) => {
+    await gate;
+    return save(data);
+  };
+  const sent = b.app.send(FIELDS).catch((err) => err.code);
+  await b.clock.advance(0);
+  const stopped = b.app.stop();
+  open();
+  assert.equal(await sent, 'stopped');
+  await stopped;
+  assert.equal(b.api.requests.length, 0);
+});
+
+test('an event refused (secret) does not make the next sends replies', async () => {
+  const b = await setup({ config: { ...BASE_CONFIG, inbound_secret: SECRET } });
+  for (let i = 0; i < 5; i += 1) {
+    await b.inbound({ event: 'ping', secret: 'wrong-secret' });
+    assert.equal((await b.scene()).success, true, `round ${i + 1}`);
+    await b.wait(SECOND);
+  }
+  assert.equal(b.gladys.fake.sceneEvents.length, 0);
+});
+
+test('refused requests never take the room of accepted events; logged once a minute', async () => {
+  const b = await setup({ config: { ...BASE_CONFIG, inbound_secret: SECRET } });
+  for (let i = 0; i < 70; i += 1) await b.app.handleInbound({ body: '{"event":"e"}' });
+  await b.app.handleInbound({ body: JSON.stringify({ event: 'e', secret: SECRET }) });
+  assert.equal(b.gladys.fake.sceneEvents.length, 1);
+  assert.equal(b.lines.filter((l) => /ignored: bad_secret/.test(l)).length, 1);
+});
+
+test('a reply is judged when the scene calls it, not when it leaves the queue', async () => {
+  const b = await setup({
+    config: { ...BASE_CONFIG, max_sends_per_day: 100 },
+    handler: () => new Promise((resolve) => b.clock.timers.setTimeout(resolve, 9_000)),
+  });
+  for (let i = 0; i < 3; i += 1) {
+    await b.app.handleInbound({ body: '{"event":"ping"}' });
+    const ack = b.scene();
+    await b.run(10 * SECOND);
+    assert.equal((await ack).success, true);
+    await b.run(20 * SECOND);
+  }
+  // The fourth reply waits 9 s behind a slow send: still a reply.
+  const slow = b.scene({ zap: '1', event: 'other' });
+  await b.run(SECOND);
+  await b.app.handleInbound({ body: '{"event":"ping"}' });
+  const reply = b.scene();
+  await b.run(30 * SECOND);
+  assert.equal((await slow).success, true);
+  assert.match(message(await reply), /probable loop/);
 });

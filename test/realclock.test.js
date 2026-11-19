@@ -63,13 +63,16 @@ const FIELDS = { zap: '1', event: 'tick' };
 // 10 simulated seconds, and the scene budget (25 s) would run out.
 const BUDGET = 3_600_000;
 
-/** Tries a send every `step` simulated ms until one succeeds; resolves its time. */
+/**
+ * Tries a send every `step` simulated ms until one succeeds; resolves the time
+ * of its DECISION (the clock read by the guards, kept in the counted entry):
+ * at 10,000 times real speed, a read before send() would be seconds early.
+ */
 async function firstSuccess({ app, clock }, step, limit) {
   const start = clock.monotonic();
   while (clock.monotonic() - start < limit) {
-    const at = clock.monotonic();
     const out = await app.send(FIELDS, { budget: BUDGET }).catch(() => undefined);
-    if (out) return at;
+    if (out) return app.calls.at(-1).mono;
     await clock.sleep(step);
   }
   throw new Error('never sent');
@@ -82,7 +85,7 @@ test('real clock: the pause after a 5xx lasts 60 s, never less', async (t) => {
     config: { hook_1: HOOK },
   });
   await b.app.send(FIELDS, { budget: BUDGET }).catch(() => {});
-  const failedAt = b.requests[0].at;
+  const failedAt = b.app.calls[0].mono; // the 5xx stays counted: its decision time
   const at = await firstSuccess(b, 2_000, 200_000);
   const gap = at - failedAt;
   assert.ok(gap >= 60_000 && gap <= 90_000, `pause of ${Math.round(gap)} ms`);
@@ -95,8 +98,8 @@ test('real clock: the daily cap frees a task 24 hours later; nothing after stop'
     speed: 10_000,
     config: { hook_1: HOOK, max_sends_per_day: 5 },
   });
-  const sentAt = b.clock.monotonic();
   for (let i = 0; i < 5; i += 1) await b.app.send(FIELDS, { budget: BUDGET });
+  const sentAt = b.app.calls[0].mono; // the decision of the first send
   const at = await firstSuccess(b, 10 * 60_000, 30 * 60 * 60_000);
   const gap = at - sentAt;
   assert.ok(

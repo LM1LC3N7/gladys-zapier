@@ -21,8 +21,8 @@
         "fr": "Zapier, dans les deux sens"
       },
       "description": {
-        "en": "Unofficial connector, not affiliated with Zapier. To Zapier: the scene actions \"Send to a Zap\" post an event to the Catch Hook URL of a Zap whose trigger is \"Webhooks by Zapier\" (a premium app: a paid Zapier plan is needed). Each send runs the Zap and uses at least one Zapier task: the caps below stop the module before your plan is used up. Zapier is called only by the scene actions and the test button, never at start nor on a timer. Never tested with a real Zapier account yet.",
-        "fr": "Connecteur non officiel, sans lien avec Zapier. Vers Zapier : les actions de scène « Envoyer à un Zap » postent un événement vers l'URL Catch Hook d'un Zap dont le déclencheur est « Webhooks by Zapier » (une application premium : une offre Zapier payante est nécessaire). Chaque envoi lance le Zap et utilise au moins une tâche Zapier : les plafonds ci-dessous arrêtent le module avant que votre offre soit épuisée. Zapier n'est appelé que par les actions de scène et le bouton de test, jamais au démarrage ni sur une minuterie. Jamais testé avec un vrai compte Zapier pour l'instant."
+        "en": "Unofficial connector, not affiliated with Zapier. To Zapier: the scene actions \"Send to a Zap\" post an event to the Catch Hook URL of a Zap whose trigger is \"Webhooks by Zapier\" (a premium app: a paid Zapier plan is needed). Each send runs the Zap, and Zapier bills a task per action step that runs. The module counts Zap runs (one per Zap started) and refuses a send beyond the caps below: divide the tasks of your plan by the action steps of your Zaps. Zapier is called only by the scene actions and the test button, never at start nor on a timer. Never tested with a real Zapier account yet.",
+        "fr": "Connecteur non officiel, sans lien avec Zapier. Vers Zapier : les actions de scène « Envoyer à un Zap » postent un événement vers l'URL Catch Hook d'un Zap dont le déclencheur est « Webhooks by Zapier » (une application premium : une offre Zapier payante est nécessaire). Chaque envoi lance le Zap, et Zapier facture une tâche par étape d'action exécutée. Le module compte les exécutions de Zap (une par Zap lancé) et refuse un envoi au-delà des plafonds ci-dessous : divisez les tâches de votre offre par le nombre d'étapes d'action de vos Zaps. Zapier n'est appelé que par les actions de scène et le bouton de test, jamais au démarrage ni sur une minuterie. Jamais testé avec un vrai compte Zapier pour l'instant."
       },
       "links": [
         {
@@ -98,12 +98,12 @@
       "key": "max_sends_per_day",
       "type": "number",
       "label": {
-        "en": "Maximum tasks over 24 hours",
-        "fr": "Nombre maximal de tâches sur 24 heures"
+        "en": "Maximum Zap runs over 24 hours",
+        "fr": "Nombre maximal d'exécutions de Zap sur 24 heures"
       },
       "description": {
-        "en": "Counted by the module before each send, kept across restarts: one task per Zap the hook starts (1 to 2000). Beyond, a send is refused.",
-        "fr": "Comptées par le module avant chaque envoi, gardées au redémarrage : une tâche par Zap que le hook lance (de 1 à 2000). Au-delà, un envoi est refusé."
+        "en": "Counted by the module before each send, kept across restarts: one run per Zap the hook starts (1 to 2000). Beyond, a send is refused.",
+        "fr": "Comptées par le module avant chaque envoi, gardées au redémarrage : une exécution par Zap que le hook lance (de 1 à 2000). Au-delà, un envoi est refusé."
       },
       "required": false,
       "default": 20,
@@ -114,12 +114,12 @@
       "key": "max_sends_per_month",
       "type": "number",
       "label": {
-        "en": "Maximum tasks over 30 days",
-        "fr": "Nombre maximal de tâches sur 30 jours"
+        "en": "Maximum Zap runs over 30 days",
+        "fr": "Nombre maximal d'exécutions de Zap sur 30 jours"
       },
       "description": {
-        "en": "A rolling 30 days, not your Zapier billing month: set it below the tasks of your plan, minus what your other Zaps use (1 to 50000).",
-        "fr": "Sur 30 jours glissants, pas votre mois de facturation Zapier : réglez-le sous les tâches de votre offre, moins ce qu'utilisent vos autres Zaps (de 1 à 50000)."
+        "en": "A rolling 30 days, not your Zapier billing month: set it below the tasks of your plan divided by the action steps of your Zaps, minus what your other Zaps use (1 to 50000).",
+        "fr": "Sur 30 jours glissants, pas votre mois de facturation Zapier : réglez-le sous les tâches de votre offre divisées par le nombre d'étapes d'action de vos Zaps, moins ce qu'utilisent vos autres Zaps (de 1 à 50000)."
       },
       "required": false,
       "default": 500,
@@ -134,8 +134,8 @@
         "fr": "De Zapier vers Gladys (Gladys Plus)"
       },
       "description": {
-        "en": "Needs Gladys Plus: without it, only the sends to Zapier work. Link Gladys Plus and paste your Open API key in the \"Gladys Plus webhooks\" block: Gladys then shows the public URL to use in a Zap with the action \"Webhooks by Zapier\" → \"POST\" (Payload Type json, data event = my_event, value1, value2, value3, and secret if you set one below). Your scenes then use the trigger \"Event received from Zapier\". That URL is a secret too. An event received never sends anything to Zapier; a scene that answers it by sending to a Zap that calls Gladys again is a loop: the module stops sending for 30 minutes after 3 such rounds.",
-        "fr": "Nécessite Gladys Plus : sans lui, seuls les envois vers Zapier marchent. Liez Gladys Plus et collez votre clé Open API dans le bloc « Webhooks Gladys Plus » : Gladys affiche alors l'URL publique à utiliser dans un Zap avec l'action « Webhooks by Zapier » → « POST » (Payload Type json, data event = mon_evenement, value1, value2, value3, et secret si vous en saisissez un ci-dessous). Vos scènes utilisent ensuite le déclencheur « Événement reçu de Zapier ». Cette URL est un secret elle aussi. Un événement reçu n'envoie jamais rien vers Zapier ; une scène qui y répond en envoyant à un Zap qui rappelle Gladys forme une boucle : le module arrête ses envois 30 minutes après 3 allers-retours."
+        "en": "Needs Gladys Plus: without it, only the sends to Zapier work. Link Gladys Plus and paste your Open API key in the \"Gladys Plus webhooks\" block: Gladys then shows the public URL to use in a Zap with the action \"Webhooks by Zapier\" → \"POST\" (Payload Type json, data event = my_event, value1, value2, value3, and secret if you set one below). Your scenes then use the trigger \"Event received from Zapier\". That URL is a secret too. An event received never sends anything to Zapier. A scene that answers it at once by sending to a Zap that calls Gladys again loops: the module stops sending for 30 minutes after 3 such rounds; a scene that waits 15 s or more escapes this guard, only the caps stop it.",
+        "fr": "Nécessite Gladys Plus : sans lui, seuls les envois vers Zapier marchent. Liez Gladys Plus et collez votre clé Open API dans le bloc « Webhooks Gladys Plus » : Gladys affiche alors l'URL publique à utiliser dans un Zap avec l'action « Webhooks by Zapier » → « POST » (Payload Type json, data event = mon_evenement, value1, value2, value3, et secret si vous en saisissez un ci-dessous). Vos scènes utilisent ensuite le déclencheur « Événement reçu de Zapier ». Cette URL est un secret elle aussi. Un événement reçu n'envoie jamais rien vers Zapier. Une scène qui y répond aussitôt en envoyant à un Zap qui rappelle Gladys boucle : le module arrête ses envois 30 minutes après 3 allers-retours ; une scène qui attend 15 s ou plus échappe à cette garde, seuls les plafonds l'arrêtent."
       }
     },
     {
@@ -161,8 +161,8 @@
         "fr": "Envoyer un événement de test"
       },
       "description": {
-        "en": "Posts the event \"gladys_test\" (value1 = Gladys, value2 = test, test = true) to the Catch Hook chosen: the Zap runs and the task counts against the caps. Also says whether events can come from Zapier.",
-        "fr": "Poste l'événement « gladys_test » (value1 = Gladys, value2 = test, test = true) vers le Catch Hook choisi : le Zap s'exécute et la tâche compte dans les plafonds. Dit aussi si des événements peuvent venir de Zapier."
+        "en": "Posts the event \"gladys_test\" (value1 = Gladys, value2 = test, test = true) to the Catch Hook chosen: the Zap runs and counts against the caps. Also says whether events can come from Zapier.",
+        "fr": "Poste l'événement « gladys_test » (value1 = Gladys, value2 = test, test = true) vers le Catch Hook choisi : le Zap s'exécute et compte dans les plafonds. Dit aussi si des événements peuvent venir de Zapier."
       },
       "fields": [
         {
@@ -270,8 +270,8 @@
           "key": "payload",
           "type": "string",
           "label": {
-            "en": "Other fields (JSON)",
-            "fr": "Autres champs (JSON)"
+            "en": "Other fields (JSON, at most 1000 characters)",
+            "fr": "Autres champs (JSON, 1000 caractères au plus)"
           }
         }
       ]
@@ -285,8 +285,8 @@
         "fr": "Envoyer à un Zap"
       },
       "description": {
-        "en": "Posts the event and up to three values to the Catch Hook of the Zap chosen: the Zap runs (at least one Zapier task, counted against the caps). Not tried again when Zapier does not answer.",
-        "fr": "Poste l'événement et jusqu'à trois valeurs vers le Catch Hook du Zap choisi : le Zap s'exécute (au moins une tâche Zapier, comptée dans les plafonds). Pas de nouvel essai si Zapier ne répond pas."
+        "en": "Posts the event and up to three values to the Catch Hook of the Zap chosen: the Zap runs (counted against the caps; Zapier bills a task per action step). Not tried again when Zapier does not answer.",
+        "fr": "Poste l'événement et jusqu'à trois valeurs vers le Catch Hook du Zap choisi : le Zap s'exécute (compté dans les plafonds ; Zapier facture une tâche par étape d'action). Pas de nouvel essai si Zapier ne répond pas."
       },
       "timeout_seconds": 45,
       "fields": [
@@ -374,11 +374,11 @@
           }
         },
         {
-          "key": "tasks",
+          "key": "zap_runs",
           "type": "number",
           "label": {
-            "en": "Tasks counted",
-            "fr": "Tâches comptées"
+            "en": "Zap runs counted",
+            "fr": "Exécutions de Zap comptées"
           }
         }
       ]
@@ -461,11 +461,11 @@
           }
         },
         {
-          "key": "tasks",
+          "key": "zap_runs",
           "type": "number",
           "label": {
-            "en": "Tasks counted",
-            "fr": "Tâches comptées"
+            "en": "Zap runs counted",
+            "fr": "Exécutions de Zap comptées"
           }
         }
       ]
