@@ -10,6 +10,8 @@ the notes of the version's GitHub Release.
 
 ## [Unreleased]
 
+## [0.1.1] - 2026-11-19
+
 ### Added
 
 - The scene actions "Send to a Zap" (event and up to three values) and "Send JSON to a Zap"
@@ -28,3 +30,6 @@ the notes of the version's GitHub Release.
   most); a hook answered 404/410 no longer used by scenes until a new URL or a test succeeds.
 - A loop guard: 3 sends within 5 minutes each called less than 15 s after an event received stop
   every send for 30 minutes (a scene waiting longer escapes it; only the caps stop it).
+
+[Unreleased]: https://github.com/LM1LC3N7/gladys-zapier/compare/v0.1.1...HEAD
+[0.1.1]: https://github.com/LM1LC3N7/gladys-zapier/releases/tag/v0.1.1
