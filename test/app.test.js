@@ -48,7 +48,7 @@ test('send_event: one POST to the hook, counted and saved before it leaves', asy
   assert.equal(r.init.redirect, 'manual');
   assert.match(
     r.headers['User-Agent'],
-    /^gladys-zapier\/0\.1\.0 \(\+https:\/\/github\.com\/LM1LC3N7\/gladys-zapier\)$/,
+    /^gladys-zapier\/\d+\.\d+\.\d+ \(\+https:\/\/github\.com\/LM1LC3N7\/gladys-zapier\)$/,
   );
   assert.equal(r.headers['Content-Type'], 'application/json');
   assert.equal(r.headers.Accept, 'application/json');

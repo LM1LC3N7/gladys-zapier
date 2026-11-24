@@ -10,6 +10,10 @@ the notes of the version's GitHub Release.
 
 ## [Unreleased]
 
+### Fixed
+
+- The User-Agent gives the real version (it said 0.1.0 whatever the release).
+
 ## [0.1.1] - 2026-11-19
 
 ### Added
