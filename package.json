@@ -1,6 +1,6 @@
 {
   "name": "gladys-zapier",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "private": true,
   "description": "Zapier for Gladys Assistant: send scene events to Zaps (Catch Hook) and start scenes from a Zap through Gladys Plus webhooks. Unofficial.",
   "type": "module",

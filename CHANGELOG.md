@@ -10,6 +10,8 @@ the notes of the version's GitHub Release.
 
 ## [Unreleased]
 
+## [0.1.2] - 2026-11-24
+
 ### Fixed
 
 - The User-Agent gives the real version (it said 0.1.0 whatever the release).
@@ -35,5 +37,6 @@ the notes of the version's GitHub Release.
 - A loop guard: 3 sends within 5 minutes each called less than 15 s after an event received stop
   every send for 30 minutes (a scene waiting longer escapes it; only the caps stop it).
 
-[Unreleased]: https://github.com/LM1LC3N7/gladys-zapier/compare/v0.1.1...HEAD
+[Unreleased]: https://github.com/LM1LC3N7/gladys-zapier/compare/v0.1.2...HEAD
+[0.1.2]: https://github.com/LM1LC3N7/gladys-zapier/compare/v0.1.1...v0.1.2
 [0.1.1]: https://github.com/LM1LC3N7/gladys-zapier/releases/tag/v0.1.1
